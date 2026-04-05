@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camping Park Mystery</title>
+  <style>
+    /* =====================================================
+       PAGE & BODY
+       ===================================================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 20px 0 40px;
+      font-family: monospace;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* =====================================================
+       GAME BOY BODY
+       ===================================================== */
+    .gameboy {
+      width: 500px;
+      background: linear-gradient(170deg, #7b3fc4 0%, #5a2299 40%, #3a1070 100%);
+      border-radius: 12px 12px 50px 50px;
+      padding: 18px 20px 24px;
+      box-shadow:
+        0 0 0 3px #2a0a55,
+        0 8px 40px rgba(0,0,0,0.9),
+        inset 0 1px 0 rgba(255,255,255,0.15);
+      position: relative;
+    }
+
+    /* =====================================================
+       SCREEN HOUSING
+       ===================================================== */
+    .screen-housing {
+      background: linear-gradient(180deg, #1a0a35 0%, #120828 100%);
+      border-radius: 8px 8px 30px 30px;
+      padding: 14px 14px 20px;
+      margin-bottom: 10px;
+      box-shadow:
+        inset 0 2px 8px rgba(0,0,0,0.8),
+        0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    /* Notch / indicator lights row */
+    .screen-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+    .indicator-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ff3355;
+      box-shadow: 0 0 6px #ff3355;
+      animation: blink-led 3s ease-in-out infinite;
+    }
+    @keyframes blink-led {
+      0%, 90%, 100% { opacity: 1; }
+      95% { opacity: 0.2; }
+    }
+    .brand-screen-label {
+      font-size: 10px;
+      color: #c4a0ff;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* Screen bezel */
+    .screen-bezel {
+      background: #050505;
+      border-radius: 4px;
+      padding: 6px;
+      box-shadow:
+        inset 0 0 20px rgba(0,0,0,0.9),
+        inset 0 0 4px rgba(0,0,0,1),
+        0 0 0 2px #0a0a0a;
+    }
+
+    /* Container where Phaser mounts the canvas */
+    #screen-container {
+      width: 100%;
+      background: #0a120a;
+      border-radius: 2px;
+      overflow: hidden;
+      line-height: 0; /* prevents extra space below canvas */
+    }
+
+    /* Make the Phaser canvas fill the screen container */
+    #screen-container canvas {
+      width: 100% !important;
+      height: auto !important;
+      display: block;
+      image-rendering: pixelated; /* keep pixels crisp */
+    }
+
+    /* Brand label below screen */
+    .brand-label {
+      text-align: center;
+      color: #c4a0ff;
+      font-size: 13px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      margin-top: 10px;
+      opacity: 0.8;
+      text-shadow: 0 0 8px rgba(196,160,255,0.4);
+    }
+
+    /* =====================================================
+       CONTROLS AREA
+       ===================================================== */
+    .controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 10px 10px;
+    }
+
+    /* --- D-PAD --- */
+    .dpad-wrapper {
+      position: relative;
+      width: 120px;
+      height: 120px;
+    }
+
+    /* Horizontal and vertical bars of the cross */
+    .dpad-h, .dpad-v {
+      position: absolute;
+      background: #1a1a1a;
+      border-radius: 4px;
+      box-shadow:
+        0 4px 0 #0a0a0a,
+        inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .dpad-h {
+      width: 120px;
+      height: 40px;
+      top: 40px;
+      left: 0;
+    }
+    .dpad-v {
+      width: 40px;
+      height: 120px;
+      top: 0;
+      left: 40px;
+    }
+
+    /* Center circle of d-pad */
+    .dpad-center {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      background: #151515;
+      border-radius: 50%;
+      top: 42px;
+      left: 42px;
+      z-index: 2;
+    }
+
+    /* Directional hit zones */
+    .dpad-btn {
+      position: absolute;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #555;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.05s;
+    }
+    .dpad-btn:active, .dpad-btn.pressed {
+      background: rgba(255,255,255,0.08);
+      color: #aaa;
+    }
+    .dpad-up    { width: 40px; height: 40px; top: 2px;  left: 40px; }
+    .dpad-down  { width: 40px; height: 40px; top: 78px; left: 40px; }
+    .dpad-left  { width: 40px; height: 40px; top: 40px; left: 2px;  }
+    .dpad-right { width: 40px; height: 40px; top: 40px; left: 78px; }
+
+    /* --- ACTION BUTTONS (A and B) --- */
+    .action-buttons {
+      position: relative;
+      width: 120px;
+      height: 120px;
+    }
+
+    .btn-circle {
+      position: absolute;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.05s, box-shadow 0.05s;
+      font-family: monospace;
+    }
+    .btn-circle:active, .btn-circle.pressed {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.5) !important;
+    }
+
+    .btn-a {
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle at 35% 35%, #e63355, #aa1133);
+      color: #fff;
+      box-shadow: 0 5px 0 #660a22, 0 6px 12px rgba(0,0,0,0.5);
+      top: 10px;
+      right: 0;
+    }
+    .btn-b {
+      width: 52px;
+      height: 52px;
+      background: radial-gradient(circle at 35% 35%, #3399ee, #1166bb);
+      color: #fff;
+      box-shadow: 0 4px 0 #0a3366, 0 5px 10px rgba(0,0,0,0.5);
+      bottom: 10px;
+      left: 0;
+    }
+
+    /* Button labels (A = interact, B = reserved) */
+    .btn-label {
+      position: absolute;
+      font-size: 9px;
+      color: #c4a0ff;
+      font-family: monospace;
+      letter-spacing: 1px;
+    }
+    .btn-a-label { top: 4px;   right: 10px; }
+    .btn-b-label { bottom: 4px; left: 10px; }
+
+    /* =====================================================
+       BOTTOM BAR — SELECT / START
+       ===================================================== */
+    .bottom-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      padding: 6px 0 4px;
+    }
+
+    .btn-small {
+      background: #222;
+      border: none;
+      border-radius: 20px;
+      padding: 6px 16px;
+      color: #888;
+      font-family: monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 2px 0 #111, inset 0 1px 0 rgba(255,255,255,0.05);
+      transition: transform 0.05s;
+    }
+    .btn-small:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 #111;
+    }
+
+    /* Triangle logo (like Delta) bottom right */
+    .delta-logo {
+      position: absolute;
+      bottom: 18px;
+      right: 22px;
+      width: 0;
+      height: 0;
+      border-left: 11px solid transparent;
+      border-right: 11px solid transparent;
+      border-bottom: 20px solid rgba(196,160,255,0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =====================================================
+       GAME BOY SHELL
+       ===================================================== -->
+  <div class="gameboy">
+
+    <!-- Screen area -->
+    <div class="screen-housing">
+      <div class="screen-top-bar">
+        <div class="indicator-dot"></div>
+        <span class="brand-screen-label">Mystery Boy</span>
+        <div style="width:6px"></div>
+      </div>
+      <div class="screen-bezel">
+        <!-- Phaser mounts its canvas here -->
+        <div id="screen-container"></div>
+      </div>
+    </div>
+
+    <!-- Brand name below screen -->
+    <div class="brand-label">Mystery Boy</div>
+
+    <!-- Main controls row -->
+    <div class="controls-row">
+
+      <!-- D-Pad -->
+      <div class="dpad-wrapper">
+        <div class="dpad-h"></div>
+        <div class="dpad-v"></div>
+        <div class="dpad-center"></div>
+        <div class="dpad-btn dpad-up"    data-key="up">    ▲ </div>
+        <div class="dpad-btn dpad-down"  data-key="down">  ▼ </div>
+        <div class="dpad-btn dpad-left"  data-key="left">  ◀ </div>
+        <div class="dpad-btn dpad-right" data-key="right"> ▶ </div>
+      </div>
+
+      <!-- A and B buttons -->
+      <div class="action-buttons">
+        <span class="btn-label btn-a-label">INTERACT</span>
+        <span class="btn-label btn-b-label">B</span>
+        <div class="btn-circle btn-a" id="btn-a">A</div>
+        <div class="btn-circle btn-b" id="btn-b">B</div>
+      </div>
+
+    </div>
+
+    <!-- Select / Start -->
+    <div class="bottom-bar">
+      <button class="btn-small" id="btn-select">Select</button>
+      <button class="btn-small" id="btn-start">Start</button>
+    </div>
+
+    <!-- Decorative triangle logo -->
+    <div class="delta-logo"></div>
+
+  </div><!-- end .gameboy -->
+
+
+  <!-- =====================================================
+       SCRIPTS — load in dependency order
+       ===================================================== -->
+
+  <!-- 1. Phaser from CDN (no npm needed) -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+
+  <!-- 2. UI classes (no dependencies) -->
+  <script src="js/ui/DialogueBox.js"></script>
+  <script src="js/ui/QuestTracker.js"></script>
+
+  <!-- 3. Game scene (depends on DialogueBox + QuestTracker) -->
+  <script src="js/scenes/GameScene.js"></script>
+
+  <!-- 4. Boot (depends on GameScene) -->
+  <script src="js/game.js"></script>
+
+  <!-- =====================================================
+       ON-SCREEN BUTTON CONTROLS
+       ===================================================== -->
+  <script>
+    // D-pad directional buttons
+    const dpadBtns = document.querySelectorAll('.dpad-btn');
+    dpadBtns.forEach(btn => {
+      const key = btn.dataset.key;
+
+      function press()   { window.virtualKeys[key] = true;  btn.classList.add('pressed'); }
+      function release() { window.virtualKeys[key] = false; btn.classList.remove('pressed'); }
+
+      btn.addEventListener('mousedown',   press);
+      btn.addEventListener('touchstart',  press,   { passive: true });
+      btn.addEventListener('mouseup',     release);
+      btn.addEventListener('mouseleave',  release);
+      btn.addEventListener('touchend',    release);
+      btn.addEventListener('touchcancel', release);
+    });
+
+    // A button — interact / dismiss dialogue
+    // Uses a "was pressed" flag so holding doesn't repeat-fire
+    const btnA = document.getElementById('btn-a');
+    function pressA() {
+      window.virtualKeys.action = true;
+      btnA.classList.add('pressed');
+    }
+    function releaseA() {
+      window.virtualKeys.action = false;
+      btnA.classList.remove('pressed');
+    }
+    btnA.addEventListener('mousedown',   pressA);
+    btnA.addEventListener('touchstart',  pressA,   { passive: true });
+    btnA.addEventListener('mouseup',     releaseA);
+    btnA.addEventListener('mouseleave',  releaseA);
+    btnA.addEventListener('touchend',    releaseA);
+    btnA.addEventListener('touchcancel', releaseA);
+
+    // B button — reserved for future use
+    const btnB = document.getElementById('btn-b');
+    btnB.addEventListener('mousedown',  () => btnB.classList.add('pressed'));
+    btnB.addEventListener('mouseup',    () => btnB.classList.remove('pressed'));
+    btnB.addEventListener('mouseleave', () => btnB.classList.remove('pressed'));
+
+    // Prevent context menu on long-press (important for mobile)
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Prevent scroll when using arrow keys or WASD
+    window.addEventListener('keydown', e => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  </script>
+
+</body>
+</html>
