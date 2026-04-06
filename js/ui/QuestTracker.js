@@ -1,21 +1,24 @@
 // ============================================================
 // QuestTracker.js
-// Tracks quest state and shows the current objective on screen.
-// Three states: EXPLORE → FOUND_CLUE → FIND_WAY_IN
+// Five quest states with a clean UI strip at the top of screen.
 // ============================================================
 
-// Quest state constants (used by GameScene to advance progress)
+// ---- Quest state constants (used throughout GameScene) ------
 const QUEST_STATES = {
-    EXPLORE:     0,  // Starting state — just explore
-    FOUND_CLUE:  1,  // Player approached the restricted area
-    FIND_WAY_IN: 2   // Player interacted with the glowing clue
+    EXPLORE:          0,  // Just arrived — look around
+    DISCOVERED_CLUE:  1,  // Saw something glowing near the fence
+    NEED_TOOL:        2,  // Examined the clue — gate is locked
+    HAS_TOOL:         3,  // Picked up the bolt cutters
+    INSIDE:           4   // Entered the restricted area
 };
 
-// Text shown for each quest state
+// ---- One label per state ------------------------------------
 const QUEST_LABELS = [
-    'Objective: Explore the campground',
-    'Objective: Investigate the glow near the fence',
-    'Objective: Find a way inside the restricted area'
+    'Explore the campground',
+    'Investigate the glow near the fence',
+    'The gate is locked — find something to open it',
+    'Use the bolt cutters on the fence gate',
+    'Find the source of the signal'
 ];
 
 class QuestTracker {
@@ -23,48 +26,60 @@ class QuestTracker {
         this.scene = scene;
         this.state = QUEST_STATES.EXPLORE;
 
-        // Dark semi-transparent background strip
+        // Thin dark strip behind the text
         this.bg = scene.add.graphics();
-        this.bg.fillStyle(0x000000, 0.60);
-        this.bg.fillRect(5, 5, 330, 22);
+        this._drawBg(QUEST_LABELS[0]);
         this.bg.setScrollFactor(0).setDepth(90);
 
-        // Gold objective text
-        this.label = scene.add.text(10, 8, QUEST_LABELS[0], {
+        // Small "OBJECTIVE" header label
+        this.header = scene.add.text(10, 7, 'OBJECTIVE', {
+            fontSize: '8px',
+            fill: '#888888',
+            fontFamily: 'monospace',
+            letterSpacing: 2
+        }).setScrollFactor(0).setDepth(91);
+
+        // Main objective text in gold
+        this.label = scene.add.text(10, 17, QUEST_LABELS[0], {
             fontSize: '11px',
             fill: '#ffd700',
             fontFamily: 'monospace'
         }).setScrollFactor(0).setDepth(91);
     }
 
+    // Redraw bg to fit text width
+    _drawBg(text) {
+        this.bg.clear();
+        const w = Math.min(text.length * 7 + 20, 470);
+        this.bg.fillStyle(0x000000, 0.65);
+        this.bg.fillRect(5, 5, w, 32);
+    }
+
     // -----------------------------------------------------------
-    // advance(newState)
-    // Call with a QUEST_STATES value to progress the quest.
-    // Does nothing if newState is the same or lower than current.
+    // advance(newState) — only moves forward, never back.
+    // Plays a visual flash so the player notices.
     // -----------------------------------------------------------
     advance(newState) {
         if (newState <= this.state) return;
-
         this.state = newState;
-        this.label.setText(QUEST_LABELS[newState]);
 
-        // Brief scale-pop so the player notices the update
+        const text = QUEST_LABELS[newState];
+        this._drawBg(text);
+        this.label.setText(text);
+
+        // Flash: pop in from faded
+        this.label.setAlpha(0);
         this.scene.tweens.add({
             targets: this.label,
-            scaleX: { from: 1.15, to: 1 },
-            scaleY: { from: 1.15, to: 1 },
-            duration: 300,
+            alpha: { from: 0, to: 1 },
+            scaleX: { from: 1.12, to: 1 },
+            scaleY: { from: 1.12, to: 1 },
+            duration: 450,
             ease: 'Back.easeOut'
         });
     }
 
-    // Returns the current numeric state
-    getState() {
-        return this.state;
-    }
-
-    // Convenience: check by name, e.g. quest.is('EXPLORE')
-    is(stateName) {
-        return this.state === QUEST_STATES[stateName];
-    }
+    getState()        { return this.state; }
+    is(name)          { return this.state === QUEST_STATES[name]; }
+    atLeast(name)     { return this.state >= QUEST_STATES[name]; }
 }
