@@ -20,8 +20,18 @@ class GameScene extends Phaser.Scene {
         this._gateOpen         = false;
         this._actionWasPressed = false;
         this._autoQuestZones   = [];
+        this._footstepTimer    = 0;
 
         this.physics.world.setBounds(0, 0, W, H);
+
+        // Generate a 1×1 pixel texture used by every invisible static body.
+        // Passing null to obstacles.create() produces a zero-size body that
+        // never collides — this single fix makes ALL collisions work correctly.
+        const pg = this.make.graphics({ x: 0, y: 0, add: false });
+        pg.fillStyle(0xffffff, 1);
+        pg.fillRect(0, 0, 1, 1);
+        pg.generateTexture('pixel', 1, 1);
+        pg.destroy();
 
         // Ground + paths (drawn first, lowest depth)
         this._createGround(W, H);
@@ -99,6 +109,19 @@ class GameScene extends Phaser.Scene {
         if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
         this.player.setVelocity(vx, vy);
 
+        // Footstep sound every ~340 ms while moving
+        if (vx !== 0 || vy !== 0) {
+            this._footstepTimer -= 16; // ~1 frame at 60fps
+            if (this._footstepTimer <= 0) {
+                this._footstepTimer = 340;
+                if (window.soundManager && window.soundManager.ready) {
+                    window.soundManager.playFootstep();
+                }
+            }
+        } else {
+            this._footstepTimer = 0;
+        }
+
         // Floating hint above nearest interactable
         const nearest = this._nearestInteractable();
         if (nearest) {
@@ -153,6 +176,11 @@ class GameScene extends Phaser.Scene {
         const speaker = typeof obj.getSpeaker === 'function' ? obj.getSpeaker(this) : (obj.speaker || '');
         if (!text) return;
 
+        // Play a short blip on every interaction
+        if (window.soundManager && window.soundManager.ready) {
+            window.soundManager.playInteract();
+        }
+
         // First-time clue discovery gets a camera shake + flash
         const firstClue = obj.id === 'glowing_clue' && !this.quest.atLeast('NEED_TOOL');
         if (firstClue) {
@@ -166,9 +194,12 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    // Camera shake + white flash, then show dialogue
+    // Camera shake + white flash + discovery sting, then show dialogue
     _showDiscovery(speaker, text, onDone) {
         this.cameras.main.shake(500, 0.005);
+        if (window.soundManager && window.soundManager.ready) {
+            window.soundManager.playDiscovery();
+        }
         const flash = this.add.graphics();
         flash.fillStyle(0xffffff, 1);
         flash.fillRect(0, 0, 480, 320);
@@ -263,7 +294,7 @@ class GameScene extends Phaser.Scene {
                 id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Read',
                 speaker: 'TERMINAL',
                 getText: () => 'FACILITY LOG — SECTOR 7\nBreach detected: Day 14 — Status: UNRESOLVED\nPersonnel: 23 evacuated / 21 accounted for\n[Further records corrupted]',
-                onInteract: (s) => s.quest.advance(QUEST_STATES.INSIDE)
+                onInteract: null  // quest already advanced to INSIDE when gate opened
             }
         ];
 
@@ -291,6 +322,8 @@ class GameScene extends Phaser.Scene {
             });
         }
         this.interactables.find(o => o.id === 'gate').disabled = true;
+        // Advance quest — player is now inside
+        this.quest.advance(QUEST_STATES.INSIDE);
     }
 
     // ----------------------------------------------------------
@@ -405,8 +438,8 @@ class GameScene extends Phaser.Scene {
         g.strokeRect(x + 112, y + 26, 28, 22);
 
         // Physics body
-        const b = this.obstacles.create(x + w / 2, y + h / 2, null);
-        b.setVisible(false); b.body.setSize(w, h); b.refreshBody();
+        const b = this.obstacles.create(x + w / 2, y + h / 2, 'pixel');
+        b.setVisible(false); b.setDisplaySize(w, h); b.body.setSize(w, h); b.refreshBody();
     }
 
     _createShed() {
@@ -428,8 +461,8 @@ class GameScene extends Phaser.Scene {
         g.fillStyle(0x180c04);
         g.fillRect(x + 34, y + 36, 32, 44);
 
-        const b = this.obstacles.create(x + w / 2, y + h / 2, null);
-        b.setVisible(false); b.body.setSize(w, h); b.refreshBody();
+        const b = this.obstacles.create(x + w / 2, y + h / 2, 'pixel');
+        b.setVisible(false); b.setDisplaySize(w, h); b.body.setSize(w, h); b.refreshBody();
     }
 
     _createTrees() {
@@ -469,8 +502,11 @@ class GameScene extends Phaser.Scene {
         g.fillCircle(tx - 3, ty - 24, 11);
 
         // Physics body (circular, sized to trunk+lower canopy)
-        const b = this.obstacles.create(tx, ty, null);
-        b.setVisible(false); b.body.setCircle(16, -16, -16); b.refreshBody();
+        const b = this.obstacles.create(tx, ty, 'pixel');
+        b.setVisible(false);
+        b.setDisplaySize(32, 32);
+        b.body.setSize(32, 32);
+        b.refreshBody();
     }
 
     _createFence() {
@@ -522,8 +558,8 @@ class GameScene extends Phaser.Scene {
 
         // Physics bodies
         const mkBody = (cx, cy, bw, bh) => {
-            const b = this.obstacles.create(cx, cy, null);
-            b.setVisible(false); b.body.setSize(bw, bh); b.refreshBody();
+            const b = this.obstacles.create(cx, cy, 'pixel');
+            b.setVisible(false); b.setDisplaySize(bw, bh); b.body.setSize(bw, bh); b.refreshBody();
             return b;
         };
         mkBody(1225, 340,  550, 12);   // top
@@ -532,9 +568,10 @@ class GameScene extends Phaser.Scene {
         mkBody(950,  440,  12,  200);  // left top segment (y=340–540)
         mkBody(950,  850,  12,  420);  // left bottom segment (y=640–1060)
 
-        // Gate body (destroyed when player opens gate)
-        this._gateBody = this.obstacles.create(950, 590, null);
+        // Gate body — separate reference so _openGate() can destroy just this one
+        this._gateBody = this.obstacles.create(950, 590, 'pixel');
         this._gateBody.setVisible(false);
+        this._gateBody.setDisplaySize(12, 100);
         this._gateBody.body.setSize(12, 100);
         this._gateBody.refreshBody();
     }

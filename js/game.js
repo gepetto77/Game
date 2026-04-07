@@ -27,7 +27,7 @@ const config = {
             debug: false        // set to true to see collision boxes
         }
     },
-    scene: [GameScene]
+    scene: [TitleScene, GameScene]  // TitleScene runs first, then transitions to GameScene
 };
 
 const game = new Phaser.Game(config);

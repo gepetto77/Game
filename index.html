@@ -94,7 +94,8 @@
       background: #0a120a;
       border-radius: 2px;
       overflow: hidden;
-      line-height: 0; /* prevents extra space below canvas */
+      line-height: 0;
+      position: relative; /* needed for pseudo-element overlays */
     }
 
     /* Make the Phaser canvas fill the screen container */
@@ -102,7 +103,38 @@
       width: 100% !important;
       height: auto !important;
       display: block;
-      image-rendering: pixelated; /* keep pixels crisp */
+      image-rendering: pixelated;
+    }
+
+    /* Scanline overlay — horizontal dark lines every 4px for CRT feel */
+    #screen-container::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.08) 3px,
+        rgba(0, 0, 0, 0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Vignette — darkened edges, brighter center */
+    .screen-bezel::after {
+      content: '';
+      position: absolute;
+      inset: 6px;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 0, 0, 0.45) 100%
+      );
+      pointer-events: none;
+      z-index: 11;
+      border-radius: 3px;
     }
 
     /* Brand label below screen */
@@ -353,11 +385,15 @@
   <!-- 1. Phaser from CDN (no npm needed) -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 
-  <!-- 2. UI classes (no dependencies) -->
+  <!-- 2. Audio (no dependencies — creates window.soundManager) -->
+  <script src="js/audio/SoundManager.js"></script>
+
+  <!-- 3. UI classes (no dependencies) -->
   <script src="js/ui/DialogueBox.js"></script>
   <script src="js/ui/QuestTracker.js"></script>
 
-  <!-- 3. Game scene (depends on DialogueBox + QuestTracker) -->
+  <!-- 4. Scenes (depend on UI classes) -->
+  <script src="js/scenes/TitleScene.js"></script>
   <script src="js/scenes/GameScene.js"></script>
 
   <!-- 4. Boot (depends on GameScene) -->
