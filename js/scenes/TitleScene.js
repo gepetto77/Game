@@ -114,7 +114,7 @@ class TitleScene extends Phaser.Scene {
 
         this.cameras.main.fadeOut(700, 0, 0, 0);
         this.time.delayedCall(750, () => {
-            this.scene.start('GameScene');
+            this.scene.start('ColdOpenScene');
         });
     }
 }

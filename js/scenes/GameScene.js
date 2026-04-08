@@ -48,6 +48,8 @@ class GameScene extends Phaser.Scene {
         this.quest    = new QuestTracker(this);
 
         this._createLakeShore();
+        this._createDad();
+        this._createSpecialStick();
         this._createIceCreamShack();
         this._createBulletinBoard();
         this._createFranksCamp();
@@ -274,6 +276,49 @@ class GameScene extends Phaser.Scene {
                 id: 'worker_badge', x: 1100, y: 660, range: 60, hintLabel: 'Examine',
                 speaker: 'ID BADGE',
                 text: 'PINEBROOK NUCLEAR RESERVE\nEMPLOYEE: MARCUS COLE\nID: NR-4471  CLEARANCE: LEVEL 2\n\n[EXPIRED]'
+            },
+            // ---- Dad + walking stick quest ----
+            {
+                id: 'dad', x: 515, y: 548, range: 70, hintLabel: 'Talk to Dad',
+                speaker: 'DAD',
+                getText: (s) => {
+                    if (s.collected.has('walking_stick'))
+                        return 'Treat that stick well.\nYour grandfather had one just like it.\nGood wood remembers the hands that hold it.';
+                    if (s.collected.has('stick_raw'))
+                        return 'Hey — let me see that one.\n...\nYeah. That\'s a good piece of wood, right there.\nGive me a few minutes.';
+                    return 'Hey explorer! Nice evening huh?\nListen — could you grab me some sticks for the fire?\nGood ones. Wander toward the north trail if you need to.';
+                },
+                onInteract: (s) => {
+                    if (s.collected.has('stick_raw') && !s.collected.has('walking_stick')) {
+                        // Dad carves the stick on the spot
+                        s.time.delayedCall(400, () => {
+                            s.dialogue.show('DAD',
+                                '*takes out his knife and works quietly for a moment*\n\n...\n\nHere.\nI carved your name into it. Every explorer needs a good walking stick.',
+                                () => {
+                                    s.collected.delete('stick_raw');
+                                    s.collected.add('walking_stick');
+                                    if (s._stickRawGfx) s._stickRawGfx.setVisible(false);
+                                    s._showWalkingStickHUD();
+                                }
+                            );
+                        });
+                    }
+                }
+            },
+            {
+                id: 'special_stick', x: 388, y: 248, range: 60, hintLabel: 'Pick up',
+                speaker: '',
+                getText: (s) => s.collected.has('stick_raw') || s.collected.has('walking_stick')
+                    ? '(You already have the good stick.)'
+                    : 'A gnarled branch half-buried in the moss.\nHeavier than it looks. The grain twists in a spiral.\nThere\'s something right about it.',
+                onInteract: (s) => {
+                    if (!s.collected.has('stick_raw') && !s.collected.has('walking_stick')) {
+                        s.collected.add('stick_raw');
+                        s.interactables.find(o => o.id === 'special_stick').disabled = true;
+                        if (s._stickMarker) s._stickMarker.setVisible(false);
+                        s.dialogue.show('', 'You picked up the stick.\n\nMaybe Dad would know what to do with it.');
+                    }
+                }
             },
             // ---- NPCs & world objects ----
             {
@@ -1267,4 +1312,91 @@ class GameScene extends Phaser.Scene {
         // Binoculars (he's been watching)
         g.fillStyle(0x333333); g.fillRect(kx + 5, ky - 4, 12, 6);
         g.fillStyle(0x6688aa); g.fillCircle(kx+9, ky-1, 3); g.fillCircle(kx+14, ky-1, 3);
+    }
+
+    _createDad() {
+        const dx = 515, dy = 528;
+        const g = this.add.graphics().setDepth(5);
+
+        // Ground shadow
+        g.fillStyle(0x000000, 0.15); g.fillEllipse(dx, dy + 24, 30, 10);
+
+        // Shoes (brown boots)
+        g.fillStyle(0x5a3010); g.fillRect(dx-7, dy+20, 6, 4); g.fillRect(dx+2, dy+20, 6, 4);
+        // Pants (dark khaki)
+        g.fillStyle(0x8a7040); g.fillRect(dx-6, dy+8, 5, 13); g.fillRect(dx+2, dy+8, 5, 13);
+        // Shirt (warm blue-gray flannel)
+        g.fillStyle(0x5a6a8a); g.fillRect(dx-7, dy-6, 15, 15);
+        // Shirt detail (plaid stripe)
+        g.fillStyle(0x7a8aaa, 0.5); g.fillRect(dx-7, dy-3, 15, 3); g.fillRect(dx-7, dy+3, 15, 3);
+        // Arms (down, relaxed — holding a coffee mug)
+        g.fillStyle(0x5a6a8a); g.fillRect(dx-10, dy-4, 4, 10); g.fillRect(dx+7, dy-4, 4, 10);
+        // Coffee mug in right hand
+        g.fillStyle(0x8c6040); g.fillRect(dx+9, dy+2, 6, 7);
+        g.fillStyle(0x1a0a08); g.fillRect(dx+10, dy+3, 4, 3);
+        g.lineStyle(1, 0x7a5030); g.strokeRect(dx+14, dy+4, 3, 5); // mug handle
+        // Neck + head (skin)
+        g.fillStyle(0xe8c090); g.fillRect(dx-3, dy-17, 7, 12);
+        g.fillStyle(0xe8c090); g.fillRect(dx-4, dy-6, 9, 3); // chin wider
+        // Hair (salt-and-pepper, slightly unkempt)
+        g.fillStyle(0x887878); g.fillRect(dx-4, dy-22, 9, 6);
+        g.fillStyle(0xaaaaaa, 0.5); g.fillRect(dx-4, dy-22, 5, 3); // gray streak
+        // Slight smile / face detail
+        g.fillStyle(0xc89070); g.fillRect(dx-1, dy-11, 3, 1); // mouth
+        g.fillStyle(0x2a1a1a); g.fillRect(dx-2, dy-15, 2, 2); g.fillRect(dx+1, dy-15, 2, 2); // eyes
+        // Name label (subtle, floating)
+        this.add.text(dx, dy - 34, 'DAD', {
+            fontSize: '7px', fill: '#ffd07088', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+    }
+
+    _createSpecialStick() {
+        const sx = 388, sy = 248;
+        this._stickRawGfx = this.add.graphics().setDepth(4);
+        const g = this._stickRawGfx;
+
+        // The gnarled branch on the ground
+        g.lineStyle(3, 0x7a4810);
+        g.beginPath(); g.moveTo(sx - 18, sy + 6); g.lineTo(sx + 16, sy - 8); g.strokePath();
+        g.lineStyle(2, 0x9a6030, 0.6);
+        g.beginPath(); g.moveTo(sx - 14, sy + 4); g.lineTo(sx - 4, sy - 10); g.strokePath(); // small twig
+        g.lineStyle(2, 0x9a6030, 0.6);
+        g.beginPath(); g.moveTo(sx + 8, sy - 4); g.lineTo(sx + 20, sy + 4); g.strokePath(); // small twig
+
+        // Soft golden glow (this is special)
+        const glow = this.add.graphics().setDepth(3);
+        glow.fillStyle(0xffdd88, 0.15); glow.fillEllipse(sx, sy, 48, 22);
+        this.tweens.add({
+            targets: glow, alpha: { from: 0.3, to: 0.9 }, yoyo: true, repeat: -1, duration: 1100
+        });
+
+        // Floating "!" marker
+        this._stickMarker = this.add.text(sx, sy - 24, '!', {
+            fontSize: '14px', fill: '#ffdd44', fontFamily: 'monospace', fontStyle: 'bold'
+        }).setDepth(6).setOrigin(0.5);
+        this.tweens.add({
+            targets: this._stickMarker,
+            y: sy - 30, yoyo: true, repeat: -1, duration: 600, ease: 'Sine.easeInOut'
+        });
+    }
+
+    _showWalkingStickHUD() {
+        // Small walking stick icon in top-right corner of screen
+        const hudGfx = this.add.graphics().setScrollFactor(0).setDepth(95);
+        hudGfx.fillStyle(0x000000, 0.6); hudGfx.fillRect(430, 40, 44, 22);
+        hudGfx.lineStyle(1, 0x7a4810, 0.7); hudGfx.strokeRect(430, 40, 44, 22);
+        hudGfx.lineStyle(2, 0x9a6030);
+        hudGfx.beginPath(); hudGfx.moveTo(436, 57); hudGfx.lineTo(466, 46); hudGfx.strokePath();
+
+        this.add.text(446, 43, 'STICK', {
+            fontSize: '7px', fill: '#c8a060', fontFamily: 'monospace'
+        }).setScrollFactor(0).setDepth(96);
+
+        // Flash in
+        hudGfx.setAlpha(0);
+        this.tweens.add({ targets: hudGfx, alpha: 1, duration: 600, ease: 'Back.easeOut' });
+
+        // Celebration shake
+        this.cameras.main.shake(400, 0.004);
+        if (window.soundManager && window.soundManager.ready) window.soundManager.playDiscovery();
     }
