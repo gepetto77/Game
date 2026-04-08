@@ -17,6 +17,7 @@ class GameScene extends Phaser.Scene {
         this._walkFrame        = 0;
         this._walkTimer        = 0;
         this._endingPlayed     = false;
+        this._artifactCounts   = { arrowheads: 0, pottery: 0, tools: 0 };
 
         this.physics.world.setBounds(0, 0, W, H);
 
@@ -64,6 +65,8 @@ class GameScene extends Phaser.Scene {
         this._createControlPanel();
 
         this._buildInteractables();
+        this._createArtifacts();   // must be after _buildInteractables so this.interactables exists
+        this._createCaveEntrance();
         this._setupInput();
 
         this.interactHint = this.add.text(0, 0, '', {
@@ -359,9 +362,36 @@ class GameScene extends Phaser.Scene {
             {
                 id: 'frank_campfire', x: 668, y: 795, range: 80, hintLabel: 'Approach fire',
                 speaker: 'OLD FRANK',
-                getText: (s) => s.quest.atLeast('DISCOVERED_CLUE')
-                    ? 'You found something real out there, didn\'t you. Sit down.\nThe land\'s been trying to say something for a long time.\nIf you bring me pieces of the past — arrowheads, old tools — I\'ll tell you things that might help.'
-                    : 'Heh. Thought I heard new footsteps.\nNot many people find this spot. The ones who do... usually needed to.\nName\'s Frank. Sit a spell.'
+                getText: (s) => {
+                    const n = s._artifactCounts.arrowheads + s._artifactCounts.pottery + s._artifactCounts.tools;
+                    if (n === 0 && !s.quest.atLeast('DISCOVERED_CLUE'))
+                        return 'Heh. Thought I heard new footsteps.\nNot many people find this spot.\nName\'s Frank. Sit a spell.\n\n...Bring me pieces of the past if you find them.\nArrowheads, pottery, old tools. I\'ll make it worth your while.';
+                    if (n === 0)
+                        return 'You found something out there, didn\'t you. Good.\nThe land\'s been talking for years — most people don\'t listen.\nFind me some artifacts while you\'re exploring. I\'ll trade.';
+                    if (n >= 10 && !s.collected.has('frank_lore_3'))
+                        return `${n} pieces. You\'ve been listening.\nSit down. There\'s something I need to tell you about the cave.`;
+                    if (n >= 6 && !s.collected.has('frank_lore_2'))
+                        return `Six pieces. That\'s not luck — that\'s respect for the land.\nHere\'s something worth knowing: "Project Emberlight."\nWrite that down.`;
+                    if (n >= 3 && !s.collected.has('frank_lore_1'))
+                        return `Three pieces already. Good eye.\nAlright — I\'ll tell you about the cave to the west. You\'ve earned it.`;
+                    return `You\'ve found ${n} piece${n > 1 ? 's' : ''} so far.\nKeep looking — the land gives up its secrets slowly.\nThree pieces earns you my first story.`;
+                },
+                onInteract: (s) => {
+                    const n = s._artifactCounts.arrowheads + s._artifactCounts.pottery + s._artifactCounts.tools;
+                    if (n >= 3 && !s.collected.has('frank_lore_1')) {
+                        s.collected.add('frank_lore_1');
+                        s.time.delayedCall(200, () => s.dialogue.show('OLD FRANK',
+                            'The cave entrance — west side of the park, just past the old trail.\nThe research team used those tunnels to access the site underground.\nI mapped them myself, back in \'78.\n\nSomething stopped them from going all the way down.\nThey never told me what.'));
+                    } else if (n >= 6 && !s.collected.has('frank_lore_2')) {
+                        s.collected.add('frank_lore_2');
+                        s.time.delayedCall(200, () => s.dialogue.show('OLD FRANK',
+                            '"Project Emberlight."\nThat\'s what they called it. Energy research, officially.\nBut the emissions... the readings they were getting...\nThat wasn\'t standard physics.\n\nI walked away. Should\'ve spoken up instead.'));
+                    } else if (n >= 10 && !s.collected.has('frank_lore_3')) {
+                        s.collected.add('frank_lore_3');
+                        s.time.delayedCall(200, () => s.dialogue.show('OLD FRANK',
+                            'There\'s a lower chamber in that cave.\nSealed from the inside.\nI have a feeling you already know what\'s down there.\n\n*slides something across the log*\n\nThat\'s the original survey map. Don\'t lose it.'));
+                    }
+                }
             },
             {
                 id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Access terminal',
@@ -1399,4 +1429,156 @@ class GameScene extends Phaser.Scene {
         // Celebration shake
         this.cameras.main.shake(400, 0.004);
         if (window.soundManager && window.soundManager.ready) window.soundManager.playDiscovery();
+    }
+
+    // ----------------------------------------------------------
+    // ARTIFACT COLLECTION SYSTEM
+    // ----------------------------------------------------------
+
+    _createArtifacts() {
+        // Arrowheads — dark flint triangles (6 total)
+        [
+            [185, 448], [432, 684], [596, 350],
+            [330, 916], [546, 1054], [674, 476]
+        ].forEach(([x, y], i) => this._placeArtifact(x, y, 'arrowhead', i));
+
+        // Pottery shards — curved reddish clay (3 total)
+        [
+            [158, 746], [476, 284], [726, 628]
+        ].forEach(([x, y], i) => this._placeArtifact(x, y, 'pottery', i));
+
+        // Stone tools — green-gray scrapers (2 total)
+        [
+            [296, 1096], [618, 172]
+        ].forEach(([x, y], i) => this._placeArtifact(x, y, 'tool', i));
+    }
+
+    _placeArtifact(x, y, type, idx) {
+        const key = `${type}_${idx}`;
+        const g   = this.add.graphics().setDepth(4);
+
+        // Soft glow beneath
+        const glow = this.add.graphics().setDepth(3);
+        glow.fillStyle(0xffdd88, 0.1); glow.fillEllipse(x, y, 34, 18);
+        this.tweens.add({
+            targets: glow, alpha: { from: 0.2, to: 0.75 },
+            yoyo: true, repeat: -1, duration: 1200 + idx * 180, ease: 'Sine.easeInOut'
+        });
+
+        // Artifact shape
+        if (type === 'arrowhead') {
+            g.fillStyle(0x5a5060);  // dark flint
+            g.fillTriangle(x, y - 7, x - 5, y + 5, x + 5, y + 5);
+            g.fillStyle(0x8a8090, 0.5);
+            g.fillTriangle(x - 1, y - 6, x - 2, y, x + 2, y - 2); // knap highlight
+        } else if (type === 'pottery') {
+            g.fillStyle(0x8a4030);  // red clay
+            g.fillRect(x - 7, y - 3, 14, 7);
+            g.fillStyle(0x000000, 0); g.lineStyle(1, 0xaa6050, 0.7);
+            g.lineBetween(x - 5, y - 1, x + 5, y - 1);   // incised line
+            g.lineBetween(x - 3, y + 2, x + 3, y + 2);
+        } else {                    // stone tool
+            g.fillStyle(0x5a6a50);  // greenish quartzite
+            g.fillTriangle(x - 5, y + 4, x, y - 8, x + 5, y + 4); // blade
+            g.fillStyle(0x3a4a38, 0.5);
+            g.fillTriangle(x - 2, y + 2, x, y - 4, x + 2, y + 2);
+        }
+
+        // Store gfx refs for hiding on pickup
+        this[`_agfx_${key}`]  = g;
+        this[`_aglow_${key}`] = glow;
+
+        // Labels
+        const labels = { arrowhead: 'Pick up arrowhead', pottery: 'Pick up shard', tool: 'Pick up stone tool' };
+        const descs  = {
+            arrowhead: 'A chipped flint arrowhead. Smooth edges, deliberate knapping.\nSomebody made this a long, long time ago.\n\n[Artifact: 1 of 6 arrowheads]',
+            pottery:   'A curved pottery shard — red clay, incised geometric marks.\nPart of something larger, once.\n\n[Artifact: 1 of 3 pottery shards]',
+            tool:      'A stone scraper, edge still sharp after centuries.\nThis wasn\'t made quickly.\n\n[Artifact: 1 of 2 stone tools]'
+        };
+
+        // Push interactable onto the existing array
+        this.interactables.push({
+            id: key, x, y, range: 48, hintLabel: labels[type],
+            speaker: '',
+            getText: () => descs[type],
+            onInteract: (s) => {
+                if (s.collected.has(key)) return;
+                s.collected.add(key);
+                // Count
+                const cat = type === 'arrowhead' ? 'arrowheads' : type === 'pottery' ? 'pottery' : 'tools';
+                s._artifactCounts[cat]++;
+                const total = s._artifactCounts.arrowheads + s._artifactCounts.pottery + s._artifactCounts.tools;
+                // Hide graphics
+                if (s[`_agfx_${key}`])  s[`_agfx_${key}`].setVisible(false);
+                if (s[`_aglow_${key}`]) s[`_aglow_${key}`].setVisible(false);
+                s.interactables.find(o => o.id === key).disabled = true;
+                // Brief counter flash
+                const flash = s.add.text(x, y - 28, `Artifact ${total}/11`, {
+                    fontSize: '8px', fill: '#ffdd88', fontFamily: 'monospace'
+                }).setDepth(60).setOrigin(0.5);
+                s.tweens.add({ targets: flash, y: y - 48, alpha: 0, duration: 1400, onComplete: () => flash.destroy() });
+                if (window.soundManager && window.soundManager.ready) window.soundManager.playInteract();
+            }
+        });
+    }
+
+    // ----------------------------------------------------------
+    // CAVE ENTRANCE
+    // ----------------------------------------------------------
+
+    _createCaveEntrance() {
+        const cx = 92, cy = 692;
+        const g = this.add.graphics().setDepth(3);
+
+        // Hillside / rocky outcrop
+        g.fillStyle(0x606055); g.fillEllipse(cx + 10, cy - 18, 130, 70);
+        g.fillStyle(0x505048); g.fillEllipse(cx + 18, cy - 32, 90, 46);
+
+        // Rock texture marks
+        g.lineStyle(1, 0x404038, 0.5);
+        g.lineBetween(cx - 20, cy - 28, cx - 8, cy - 18);
+        g.lineBetween(cx + 30, cy - 40, cx + 44, cy - 28);
+
+        // Cave opening — dark oval
+        g.fillStyle(0x080606); g.fillEllipse(cx, cy, 52, 38);
+        g.fillStyle(0x120e0c, 0.7); g.fillEllipse(cx - 4, cy - 5, 38, 26);
+
+        // Debris blocking entrance (rocks + roots)
+        g.fillStyle(0x6a6558); g.fillCircle(cx - 14, cy + 12, 9);
+        g.fillStyle(0x585248); g.fillCircle(cx + 10, cy + 14, 7);
+        g.fillStyle(0x706858); g.fillCircle(cx + 1,  cy + 16, 6);
+        g.fillStyle(0x2a5a1a, 0.55); g.fillEllipse(cx - 22, cy - 2, 22, 10); // moss
+
+        // Fern fronds (decorative)
+        g.lineStyle(2, 0x2a6a1a, 0.6);
+        [[-30, -8], [-26, -14], [-34, -4]].forEach(([ox, oy]) => {
+            g.beginPath(); g.moveTo(cx + ox, cy + oy); g.lineTo(cx + ox - 8, cy + oy - 14); g.strokePath();
+        });
+
+        // "CAVE" label
+        this.add.text(cx, cy - 56, '[ CAVE ]', {
+            fontSize: '7px', fill: '#88887866', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+
+        // Small warning stake
+        g.fillStyle(0xaa8830); g.fillRect(cx + 30, cy - 50, 4, 30);
+        g.fillStyle(0xddaa20); g.fillRect(cx + 24, cy - 56, 16, 10);
+        this.add.text(cx + 32, cy - 54, '!', {
+            fontSize: '8px', fill: '#1a1a00', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+
+        // Physics body — rocky outcrop blocks passage
+        const b = this.obstacles.create(cx + 10, cy - 22, 'pixel');
+        b.setVisible(false); b.setDisplaySize(130, 46); b.body.setSize(130, 46); b.refreshBody();
+
+        // Interactable
+        this.interactables.push({
+            id: 'cave_entrance', x: cx, y: cy, range: 72, hintLabel: 'Examine cave',
+            speaker: '',
+            getText: (s) => {
+                if (s.collected.has('frank_lore_1'))
+                    return 'This is the cave Frank mentioned.\nThe entrance is blocked — rocks and overgrown roots.\nYou\'d need something to clear it. The walking stick, maybe?\n\n[Return when you\'re better prepared]';
+                return 'A natural cave entrance, half-buried in the hillside.\nBlocked by rocks and years of growth.\nThere\'s cold air coming from inside.\nSomebody has been here before — the stones are too neat to be natural.';
+            }
+        });
     }
