@@ -16,7 +16,7 @@ const QUEST_STATES = {
 const QUEST_LABELS = [
     'Explore the campground',
     'Investigate the glow near the fence',
-    'The gate is locked — find something to open it',
+    'Gate is locked. Check the shed south of camp for tools',
     'Use the bolt cutters on the fence gate',
     'Find the source of the signal'
 ];

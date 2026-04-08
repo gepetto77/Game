@@ -47,6 +47,12 @@ class GameScene extends Phaser.Scene {
         this.dialogue = new DialogueBox(this);
         this.quest    = new QuestTracker(this);
 
+        this._createLakeShore();
+        this._createIceCreamShack();
+        this._createBulletinBoard();
+        this._createFranksCamp();
+        this._createCounselor();
+        this._createGoofyKid();
         this._createCampfire();
         this._createTent();
         this._createSign();
@@ -226,13 +232,14 @@ class GameScene extends Phaser.Scene {
                 text: 'A maintenance shed. Locked. Through the gap you can see tools, rope, a few paint cans.'
             },
             {
-                id: 'bolt_cutters', x: 240, y: 960, range: 55, hintLabel: 'Take',
+                id: 'bolt_cutters', x: 240, y: 960, range: 80, hintLabel: 'Take',
                 getSpeaker: () => '',
                 getText: () => 'Heavy bolt cutters leaning against the shed wall. Red grips, rusted jaw. These could cut a padlock.',
                 onInteract: (s) => {
                     s.collected.add('bolt_cutters');
-                    if (s._boltCuttersGfx) s._boltCuttersGfx.setVisible(false);
-                    if (s._boltCuttersGlow) s._boltCuttersGlow.setVisible(false);
+                    if (s._boltCuttersGfx)    s._boltCuttersGfx.setVisible(false);
+                    if (s._boltCuttersGlow)   s._boltCuttersGlow.setVisible(false);
+                    if (s._boltCuttersMarker) s._boltCuttersMarker.setVisible(false);
                     s.interactables.find(o => o.id === 'bolt_cutters').disabled = true;
                     s.quest.advance(QUEST_STATES.HAS_TOOL);
                 }
@@ -267,6 +274,49 @@ class GameScene extends Phaser.Scene {
                 id: 'worker_badge', x: 1100, y: 660, range: 60, hintLabel: 'Examine',
                 speaker: 'ID BADGE',
                 text: 'PINEBROOK NUCLEAR RESERVE\nEMPLOYEE: MARCUS COLE\nID: NR-4471  CLEARANCE: LEVEL 2\n\n[EXPIRED]'
+            },
+            // ---- NPCs & world objects ----
+            {
+                id: 'bulletin_board', x: 490, y: 415, range: 70, hintLabel: 'Read board',
+                speaker: 'BULLETIN BOARD',
+                text: 'PINEBROOK CAMPGROUND — WELCOME!\n\nSite Map posted at the entrance.\nReport wildlife sightings to the ranger cabin.\n\n[handwritten sticky note]\n"Has anyone seen my bolt cutters?\nLeft them leaning by the shed. — SITE 4"'
+            },
+            {
+                id: 'counselor', x: 420, y: 380, range: 65, hintLabel: 'Talk',
+                speaker: 'COUNSELOR DANA',
+                getText: (s) => s.quest.atLeast('INSIDE')
+                    ? 'I don\'t know how you got in there. Please stay safe — that fence is posted for a reason.'
+                    : s.quest.atLeast('NEED_TOOL')
+                    ? 'You\'re looking for something to cut a lock? Try the maintenance shed — site 4 camper was griping about missing cutters just yesterday.'
+                    : 'Welcome to Pinebrook! Explore, have fun, but stay out of the restricted zone past the east fence. Seriously.'
+            },
+            {
+                id: 'goofy_kid', x: 560, y: 535, range: 60, hintLabel: 'Talk',
+                speaker: 'KID',
+                getText: (s) => s.quest.atLeast('DISCOVERED_CLUE')
+                    ? 'See? Told you something was out there! You should find a way past that fence...'
+                    : 'Dude. Last night, around 2am, I saw this green glow by the east fence.\nMy parents said I was dreaming. I wasn\'t dreaming.'
+            },
+            {
+                id: 'fisherman', x: 490, y: 1110, range: 75, hintLabel: 'Talk',
+                speaker: 'OLD PETE',
+                getText: (s) => s.quest.atLeast('INSIDE')
+                    ? 'You found something in there, didn\'t you. I can see it in your face.\nSame look I had in \'89.'
+                    : 'Been fishin\' this lake forty years. Used to be you could eat what you caught.\n...Not anymore.'
+            },
+            {
+                id: 'ice_cream', x: 350, y: 345, range: 65, hintLabel: 'Order',
+                speaker: 'MRS. DOTTIE',
+                getText: (s) => s.collected.has('bolt_cutters')
+                    ? 'Back again? You look like you\'ve been busy. The Fudge Avalanche is on me. You\'ve earned it!'
+                    : 'What\'ll it be, sweetheart? We\'ve got Fudge Avalanche, Maple Melt, Campfire Crunch... and the Sasquatch Surprise — though I can\'t promise what\'s in it.'
+            },
+            {
+                id: 'frank_campfire', x: 668, y: 795, range: 80, hintLabel: 'Approach fire',
+                speaker: 'OLD FRANK',
+                getText: (s) => s.quest.atLeast('DISCOVERED_CLUE')
+                    ? 'You found something real out there, didn\'t you. Sit down.\nThe land\'s been trying to say something for a long time.\nIf you bring me pieces of the past — arrowheads, old tools — I\'ll tell you things that might help.'
+                    : 'Heh. Thought I heard new footsteps.\nNot many people find this spot. The ones who do... usually needed to.\nName\'s Frank. Sit a spell.'
             },
             {
                 id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Access terminal',
@@ -769,13 +819,22 @@ class GameScene extends Phaser.Scene {
         // Shimmer/highlight
         g.fillStyle(0xaaaaaa, 0.3); g.fillRect(bx - 12, by - 2, 24, 2);
 
-        // Glow indicator (collectible highlight)
+        // Glow indicator (bright collectible highlight so player can spot it)
         this._boltCuttersGlow = this.add.graphics().setDepth(3);
-        this._boltCuttersGlow.fillStyle(0xffffaa, 0.15);
-        this._boltCuttersGlow.fillCircle(bx, by, 22);
+        this._boltCuttersGlow.fillStyle(0xffee55, 0.35);
+        this._boltCuttersGlow.fillCircle(bx, by, 32);
         this.tweens.add({
             targets: this._boltCuttersGlow,
-            alpha: { from: 0.3, to: 0.8 }, yoyo: true, repeat: -1, duration: 700
+            alpha: { from: 0.5, to: 1 }, yoyo: true, repeat: -1, duration: 600
+        });
+
+        // Floating "!" pickup marker
+        this._boltCuttersMarker = this.add.text(bx, by - 38, '!', {
+            fontSize: '18px', fill: '#ffee55', fontFamily: 'monospace', fontStyle: 'bold'
+        }).setDepth(6).setOrigin(0.5);
+        this.tweens.add({
+            targets: this._boltCuttersMarker,
+            y: by - 44, yoyo: true, repeat: -1, duration: 500, ease: 'Sine.easeInOut'
         });
     }
 
@@ -998,3 +1057,214 @@ class GameScene extends Phaser.Scene {
         if (!down) this._actionWasPressed = false;
     }
 }
+
+    // ---- NEW MAP SECTIONS ----------------------------------------
+
+    _createIceCreamShack() {
+        const sx = 310, sy = 290;
+        const g = this.add.graphics().setDepth(4);
+
+        // Shadow
+        g.fillStyle(0x000000, 0.15); g.fillRect(sx+6, sy+72, 90, 10);
+
+        // Main body — bright white/cream
+        g.fillStyle(0xfff8ee); g.fillRect(sx, sy, 90, 65);
+        g.lineStyle(2, 0xddccaa); g.strokeRect(sx, sy, 90, 65);
+
+        // Roof — candy-stripe awning (pink + white alternating)
+        for (let i = 0; i < 6; i++) {
+            g.fillStyle(i % 2 === 0 ? 0xff88aa : 0xffffff);
+            g.fillRect(sx + i * 15, sy - 14, 15, 14);
+        }
+        g.lineStyle(2, 0xcc6688); g.strokeRect(sx, sy - 14, 90, 14);
+
+        // Sign
+        this.add.text(sx + 45, sy + 6, "DOTTIE'S", {
+            fontSize: '8px', fill: '#cc4466', fontFamily: 'monospace', fontStyle: 'bold'
+        }).setDepth(5).setOrigin(0.5);
+        this.add.text(sx + 45, sy + 18, 'ICE CREAM', {
+            fontSize: '7px', fill: '#884422', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+
+        // Service window
+        g.fillStyle(0x88ccee); g.fillRect(sx + 22, sy + 30, 46, 28);
+        g.lineStyle(2, 0x446688); g.strokeRect(sx + 22, sy + 30, 46, 28);
+
+        // Cone decoration in window
+        g.fillStyle(0xf4c060); g.fillTriangle(sx+45, sy+55, sx+38, sy+32, sx+52, sy+32);
+        g.fillStyle(0xff88aa); g.fillCircle(sx+45, sy+33, 8);
+        g.fillStyle(0xffffff, 0.4); g.fillCircle(sx+42, sy+31, 4);
+
+        // Physics body
+        const b = this.obstacles.create(sx+45, sy+32, 'pixel');
+        b.setVisible(false); b.setDisplaySize(90, 65); b.body.setSize(90, 65); b.refreshBody();
+    }
+
+    _createLakeShore() {
+        const g = this.add.graphics().setDepth(1);
+
+        // Lake body — deep blue-green
+        g.fillStyle(0x1a5f8a);
+        g.fillRect(80, 1040, 620, 140);
+
+        // Shallows (lighter near edge)
+        g.fillStyle(0x2a7aaa, 0.6);
+        g.fillRect(80, 1040, 620, 25);
+        g.fillRect(80, 1150, 620, 10);
+
+        // Shoreline sand strip
+        g.fillStyle(0xc8a86e);
+        g.fillRect(80, 1032, 620, 14);
+
+        // Water ripple lines (animated in update would be complex — static for now)
+        g.lineStyle(1, 0x3a8fbf, 0.3);
+        for (let y = 1058; y < 1170; y += 18) {
+            for (let x = 100; x < 680; x += 60) {
+                g.beginPath(); g.moveTo(x, y); g.lineTo(x + 30, y); g.strokePath();
+            }
+        }
+
+        // Dock
+        g.fillStyle(0x8b5e20);
+        g.fillRect(340, 1032, 8, 55);    // left post
+        g.fillRect(410, 1032, 8, 55);    // right post
+        g.fillRect(330, 1035, 100, 8);   // deck plank 1
+        g.fillRect(330, 1048, 100, 8);   // deck plank 2
+        g.fillRect(330, 1061, 100, 8);   // deck plank 3
+
+        // Old Pete (fisherman figure at end of dock)
+        const fg = this.add.graphics().setDepth(5);
+        fg.fillStyle(0x3a5a3a); fg.fillRect(375, 1058, 10, 20); // body
+        fg.fillStyle(0xe8c090); fg.fillRect(376, 1050, 8, 9);    // head
+        fg.fillStyle(0x4a3010); fg.fillRect(373, 1048, 14, 4);   // hat brim
+        fg.fillStyle(0x1a2a1a); fg.fillRect(374, 1044, 11, 5);   // hat top
+        // Fishing rod
+        fg.lineStyle(1, 0x6b3a18);
+        fg.beginPath(); fg.moveTo(385, 1056); fg.lineTo(395, 1020); fg.strokePath();
+        fg.lineStyle(1, 0x888888, 0.5);
+        fg.beginPath(); fg.moveTo(395, 1020); fg.lineTo(400, 1050); fg.strokePath();
+    }
+
+    _createBulletinBoard() {
+        const bx = 490, by = 370;
+        const g = this.add.graphics().setDepth(4);
+
+        // Post
+        g.fillStyle(0x7a4a18); g.fillRect(bx - 3, by + 30, 6, 32);
+
+        // Board backing (cork brown)
+        g.fillStyle(0xb87840); g.fillRect(bx - 42, by - 28, 84, 62);
+        g.lineStyle(3, 0x7a4a18); g.strokeRect(bx - 42, by - 28, 84, 62);
+
+        // Paper pinned to board
+        g.fillStyle(0xf8f4e0); g.fillRect(bx - 36, by - 22, 72, 50);
+
+        // "PINEBROOK" text
+        this.add.text(bx, by - 16, 'PINEBROOK', {
+            fontSize: '7px', fill: '#442200', fontFamily: 'monospace', fontStyle: 'bold'
+        }).setDepth(5).setOrigin(0.5);
+        this.add.text(bx, by - 6, 'CAMPGROUND', {
+            fontSize: '6px', fill: '#442200', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+
+        // Pinned note (yellow sticky)
+        g.fillStyle(0xffee88); g.fillRect(bx + 4, by + 4, 28, 20);
+        g.fillStyle(0xff4444); g.fillCircle(bx + 18, by + 4, 2); // pin
+
+        // Push pins on corners
+        g.fillStyle(0xff4444);
+        g.fillCircle(bx - 34, by - 20, 2); g.fillCircle(bx + 34, by - 20, 2);
+        g.fillCircle(bx - 34, by + 22, 2); g.fillCircle(bx + 34, by + 22, 2);
+
+        // Physics body (just the post — board is above player path)
+        const b = this.obstacles.create(bx, by + 46, 'pixel');
+        b.setVisible(false); b.setDisplaySize(10, 32); b.body.setSize(10, 32); b.refreshBody();
+    }
+
+    _createFranksCamp() {
+        const fx = 640, fy = 760;
+        const g = this.add.graphics().setDepth(3);
+
+        // Hidden campfire (Frank's)
+        // Stone ring
+        g.fillStyle(0x555555);
+        for (let i = 0; i < 7; i++) {
+            const a = (i / 7) * Math.PI * 2;
+            g.fillCircle(fx + Math.cos(a) * 13, fy + Math.sin(a) * 9, 4);
+        }
+        g.fillStyle(0x1a0a04); g.fillEllipse(fx, fy, 16, 10);
+
+        // Embers glow (warm orange)
+        const ember = this.add.graphics().setDepth(4);
+        ember.fillStyle(0xff6600, 0.7); ember.fillEllipse(fx, fy, 10, 6);
+        this.tweens.add({
+            targets: ember, alpha: { from: 0.4, to: 1 }, yoyo: true, repeat: -1, duration: 1100
+        });
+
+        // Frank's chair (log stump seat)
+        g.fillStyle(0x5c3d11); g.fillEllipse(fx + 22, fy + 14, 18, 12);
+        g.fillStyle(0x7a5520); g.fillEllipse(fx + 22, fy + 11, 16, 10);
+
+        // Frank's pack leaning on a tree stub
+        g.fillStyle(0x4a3820); g.fillRect(fx - 28, fy - 8, 14, 20);
+        g.fillStyle(0x3a2810); g.fillRect(fx - 25, fy - 4, 8, 12);
+
+        // Small note/map on the ground
+        g.fillStyle(0xf0e8c0); g.fillRect(fx + 8, fy + 8, 12, 10);
+        g.lineStyle(1, 0xaa8840, 0.4);
+        g.lineBetween(fx+10, fy+11, fx+18, fy+11);
+        g.lineBetween(fx+10, fy+14, fx+16, fy+14);
+
+        // Ambient glow so player can spot the fire from a distance
+        const glow = this.add.graphics().setDepth(2);
+        glow.fillStyle(0xff7700, 0.08); glow.fillCircle(fx, fy, 55);
+        this.tweens.add({
+            targets: glow, alpha: { from: 0.3, to: 0.8 }, yoyo: true, repeat: -1, duration: 1400
+        });
+    }
+
+    _createCounselor() {
+        // Camp counselor NPC figure near bulletin board area
+        const cx = 422, cy = 352;
+        const g = this.add.graphics().setDepth(5);
+
+        // Body (green camp shirt)
+        g.fillStyle(0x3a7a3a); g.fillRect(cx - 7, cy - 10, 14, 16);
+        // Shorts (khaki)
+        g.fillStyle(0xb8a060); g.fillRect(cx - 6, cy + 4, 12, 10);
+        // Skin
+        g.fillStyle(0xe8c090); g.fillRect(cx - 4, cy - 20, 8, 10);
+        // Hair (dark)
+        g.fillStyle(0x3a2010); g.fillRect(cx - 4, cy - 22, 8, 4);
+        // Cap
+        g.fillStyle(0x3a7a3a); g.fillRect(cx - 5, cy - 26, 10, 6);
+        g.fillStyle(0x2a5a2a); g.fillRect(cx - 7, cy - 22, 14, 3);
+        // Clipboard
+        g.fillStyle(0xddcc88); g.fillRect(cx + 6, cy - 8, 8, 12);
+        g.fillStyle(0xffffff); g.fillRect(cx + 7, cy - 7, 6, 10);
+        g.lineStyle(1, 0x888866, 0.5);
+        g.lineBetween(cx+8, cy-5, cx+12, cy-5);
+        g.lineBetween(cx+8, cy-2, cx+12, cy-2);
+        g.lineBetween(cx+8, cy+1, cx+11, cy+1);
+    }
+
+    _createGoofyKid() {
+        const kx = 555, ky = 508;
+        const g = this.add.graphics().setDepth(5);
+
+        // Body (orange shirt)
+        g.fillStyle(0xee7722); g.fillRect(kx - 6, ky - 8, 12, 14);
+        // Shorts (blue)
+        g.fillStyle(0x334488); g.fillRect(kx - 5, ky + 4, 10, 10);
+        // Shoes
+        g.fillStyle(0x221100); g.fillRect(kx - 5, ky + 12, 5, 3); g.fillRect(kx + 1, ky + 12, 5, 3);
+        // Skin
+        g.fillStyle(0xe8c090); g.fillRect(kx - 4, ky - 18, 8, 10);
+        // Hair (messy, spiky)
+        g.fillStyle(0xcc6600); g.fillRect(kx - 4, ky - 22, 8, 6);
+        g.fillStyle(0xdd7700); g.fillTriangle(kx-4, ky-22, kx-2, ky-28, kx, ky-22);
+        g.fillTriangle(kx, ky-22, kx+2, ky-28, kx+4, ky-22);
+        // Binoculars (he's been watching)
+        g.fillStyle(0x333333); g.fillRect(kx + 5, ky - 4, 12, 6);
+        g.fillStyle(0x6688aa); g.fillCircle(kx+9, ky-1, 3); g.fillCircle(kx+14, ky-1, 3);
+    }
