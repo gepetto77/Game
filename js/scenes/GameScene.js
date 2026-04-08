@@ -79,13 +79,18 @@ class GameScene extends Phaser.Scene {
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ffffff', fontFamily: 'monospace',
             backgroundColor: '#000000bb', padding: { x: 5, y: 3 }
-        }).setDepth(50).setVisible(false);
+        }).setDepth(96).setVisible(false);
+
+        // Day/night cycle — must come after campsites are drawn
+        this._createDayNightCycle();
 
         // Restore state if returning from CaveScene
         if (window.gameState) this._loadFromGameState();
     }
 
     update() {
+        this._updateDayNight();
+
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0, 0);
             this._handleActionPress(() => this.dialogue.tryDismiss());
@@ -2038,6 +2043,98 @@ class GameScene extends Phaser.Scene {
     }
 
     // ----------------------------------------------------------
+    // DAY / NIGHT CYCLE
+    // ----------------------------------------------------------
+
+    _createDayNightCycle() {
+        // World-space campfire glow circles (one per campsite fire + main campfire)
+        const FIRES = [
+            {x: 352,  y: 455},   // Maple  — Ben
+            {x: 779,  y: 463},   // Pine
+            {x: 1260, y: 415},   // Birch  — Harold
+            {x: 1721, y: 437},   // Cedar  — Mia
+            {x: 830,  y: 1076},  // Oak
+            {x: 244,  y: 1646},  // Willow — Frank
+        ];
+        this._fireGlows = FIRES.map(({x, y}) => {
+            const g = this.add.graphics().setDepth(5);
+            // Outer warm halo
+            g.fillStyle(0xff6600, 0.35);
+            g.fillCircle(x, y, 52);
+            // Inner bright core
+            g.fillStyle(0xffaa00, 0.45);
+            g.fillCircle(x, y, 26);
+            g.setAlpha(0); // invisible during day
+            return g;
+        });
+
+        // Screen-space star field (drawn once, alpha-controlled)
+        this._starGfx = this.add.graphics().setScrollFactor(0).setDepth(90);
+        const rng = new Phaser.Math.RandomDataGenerator(['campstars']);
+        for (let i = 0; i < 95; i++) {
+            const sx     = rng.integerInRange(0, 479);
+            const sy     = rng.integerInRange(0, 319);
+            const bright = rng.frac();
+            this._starGfx.fillStyle(0xffffff, 0.45 + bright * 0.55);
+            this._starGfx.fillRect(sx, sy, bright > 0.78 ? 2 : 1, bright > 0.78 ? 2 : 1);
+        }
+        this._starGfx.setAlpha(0);
+
+        // Screen-space darkness overlay (behind UI, above game world)
+        this._nightOverlay = this.add.graphics().setScrollFactor(0).setDepth(89);
+
+        // Tiny clock top-right
+        this._timeLabel = this.add.text(474, 4, '12:00', {
+            fontSize: '8px', fill: '#ffeebb', fontFamily: 'monospace'
+        }).setScrollFactor(0).setDepth(93).setOrigin(1, 0).setAlpha(0.35);
+
+        // Restore time if returning from cave, otherwise start at noon
+        this._dayNightT      = (window.gameState && window.gameState.dayNightT != null)
+            ? window.gameState.dayNightT : 0.08;
+        this._dayNightLastMs = this.time.now;
+    }
+
+    _updateDayNight() {
+        if (!this._nightOverlay) return;
+
+        const now = this.time.now;
+        const dt  = Math.min((now - this._dayNightLastMs) / 1000, 0.1);
+        this._dayNightLastMs = now;
+
+        const CYCLE = 180; // 3-minute full day
+        this._dayNightT = (this._dayNightT + dt / CYCLE) % 1;
+
+        const t = this._dayNightT;
+        // darkness 0 at noon (t=0), peaks 1 at midnight (t=0.5)
+        const dark = 0.5 - 0.5 * Math.cos(2 * Math.PI * t);
+        const nightAlpha = dark * 0.72;
+
+        // Night overlay
+        if (nightAlpha > 0.01) {
+            this._nightOverlay.clear();
+            this._nightOverlay.fillStyle(0x020410, 1);
+            this._nightOverlay.fillRect(0, 0, 480, 320);
+            this._nightOverlay.setAlpha(nightAlpha);
+        } else {
+            this._nightOverlay.setAlpha(0);
+        }
+
+        // Stars fade in once dark enough
+        this._starGfx.setAlpha(Phaser.Math.Clamp((nightAlpha - 0.18) * 3.0, 0, 1));
+
+        // Campfire glows intensify at night
+        const glowAlpha = Phaser.Math.Clamp((nightAlpha - 0.08) * 2.2, 0, 0.85);
+        for (const g of this._fireGlows) g.setAlpha(glowAlpha);
+
+        // Clock (24h starting from noon = t 0)
+        const totalMins = (720 + Math.floor(t * 1440)) % 1440;
+        const hh = Math.floor(totalMins / 60);
+        const mm = totalMins % 60;
+        this._timeLabel.setText(`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+        this._timeLabel.setAlpha(nightAlpha > 0.04 ? 0.75 : 0.30);
+    }
+
+    // ----------------------------------------------------------
     // GAME STATE PERSISTENCE (used when entering/leaving CaveScene)
     // ----------------------------------------------------------
 
@@ -2048,6 +2145,7 @@ class GameScene extends Phaser.Scene {
             artifactCounts: { ...this._artifactCounts },
             gateOpen:      this._gateOpen,
             endingPlayed:  this._endingPlayed,
+            dayNightT:     this._dayNightT || 0,
             // Return player near cave entrance
             playerX: 188, playerY: 1740
         };

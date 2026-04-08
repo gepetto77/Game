@@ -29,7 +29,7 @@ class QuestTracker {
         // Thin dark strip behind the text
         this.bg = scene.add.graphics();
         this._drawBg(QUEST_LABELS[0]);
-        this.bg.setScrollFactor(0).setDepth(90);
+        this.bg.setScrollFactor(0).setDepth(94);
 
         // Small "OBJECTIVE" header label
         this.header = scene.add.text(10, 7, 'OBJECTIVE', {
@@ -37,14 +37,14 @@ class QuestTracker {
             fill: '#888888',
             fontFamily: 'monospace',
             letterSpacing: 2
-        }).setScrollFactor(0).setDepth(91);
+        }).setScrollFactor(0).setDepth(95);
 
         // Main objective text in gold
         this.label = scene.add.text(10, 17, QUEST_LABELS[0], {
             fontSize: '11px',
             fill: '#ffd700',
             fontFamily: 'monospace'
-        }).setScrollFactor(0).setDepth(91);
+        }).setScrollFactor(0).setDepth(95);
     }
 
     // Redraw bg to fit text width
