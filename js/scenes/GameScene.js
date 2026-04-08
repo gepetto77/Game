@@ -73,6 +73,9 @@ class GameScene extends Phaser.Scene {
             fontSize: '9px', fill: '#ffffff', fontFamily: 'monospace',
             backgroundColor: '#000000bb', padding: { x: 5, y: 3 }
         }).setDepth(50).setVisible(false);
+
+        // Restore state if returning from CaveScene
+        if (window.gameState) this._loadFromGameState();
     }
 
     update() {
@@ -1576,9 +1579,91 @@ class GameScene extends Phaser.Scene {
             id: 'cave_entrance', x: cx, y: cy, range: 72, hintLabel: 'Examine cave',
             speaker: '',
             getText: (s) => {
+                if (s.collected.has('walking_stick') && s.collected.has('frank_lore_1'))
+                    return 'The cave Frank told you about.\nYou use the walking stick to shift the debris.\nThe opening is just wide enough.\n\n[ E ] Enter the cave';
                 if (s.collected.has('frank_lore_1'))
-                    return 'This is the cave Frank mentioned.\nThe entrance is blocked — rocks and overgrown roots.\nYou\'d need something to clear it. The walking stick, maybe?\n\n[Return when you\'re better prepared]';
+                    return 'This is the cave Frank mentioned.\nThe entrance is still blocked.\nYou\'ll need something to shift the rocks — the walking stick might work.';
                 return 'A natural cave entrance, half-buried in the hillside.\nBlocked by rocks and years of growth.\nThere\'s cold air coming from inside.\nSomebody has been here before — the stones are too neat to be natural.';
+            },
+            onInteract: (s) => {
+                if (s.collected.has('walking_stick') && s.collected.has('frank_lore_1')) {
+                    s._saveGameState();
+                    s.cameras.main.fade(900, 0, 0, 0);
+                    s.time.delayedCall(950, () => s.scene.start('CaveScene'));
+                }
             }
         });
+    }
+
+    // ----------------------------------------------------------
+    // GAME STATE PERSISTENCE (used when entering/leaving CaveScene)
+    // ----------------------------------------------------------
+
+    _saveGameState() {
+        window.gameState = {
+            collected:     Array.from(this.collected),
+            questState:    this.quest.state,
+            artifactCounts: { ...this._artifactCounts },
+            gateOpen:      this._gateOpen,
+            endingPlayed:  this._endingPlayed,
+            // Return player near cave entrance
+            playerX: 185, playerY: 800
+        };
+    }
+
+    _loadFromGameState() {
+        const gs = window.gameState;
+        if (!gs) return;
+
+        // Restore collections
+        this.collected         = new Set(gs.collected);
+        this._artifactCounts   = { ...gs.artifactCounts };
+        this._gateOpen         = gs.gateOpen;
+        this._endingPlayed     = gs.endingPlayed;
+
+        // Restore quest display (QuestTracker was already created fresh)
+        if (gs.questState > 0) {
+            this.quest.state = gs.questState;
+            const label = ['Explore the campground','Investigate the glow near the fence',
+                'Gate is locked. Check the shed south of camp for tools',
+                'Use the bolt cutters on the fence gate','Find the source of the signal'][gs.questState] || '';
+            if (label) { this.quest.label.setText(label); this.quest._drawBg(label); }
+        }
+
+        // Restore player position
+        if (gs.playerX) this.player.setPosition(gs.playerX, gs.playerY);
+
+        // Hide bolt cutters if collected
+        if (this.collected.has('bolt_cutters') || gs.collected.includes('bolt_cutters')) {
+            if (this._boltCuttersGfx)    this._boltCuttersGfx.setVisible(false);
+            if (this._boltCuttersGlow)   this._boltCuttersGlow.setVisible(false);
+            if (this._boltCuttersMarker) this._boltCuttersMarker.setVisible(false);
+        }
+
+        // Hide walking stick raw if taken by Dad
+        if (this.collected.has('walking_stick') || this.collected.has('stick_raw')) {
+            if (this._stickRawGfx)  this._stickRawGfx.setVisible(false);
+            if (this._stickMarker)  this._stickMarker.setVisible(false);
+        }
+
+        // Restore walking stick HUD
+        if (this.collected.has('walking_stick')) this._showWalkingStickHUD();
+
+        // Hide collected artifacts
+        for (const key of this.collected) {
+            if (this[`_agfx_${key}`])  this[`_agfx_${key}`].setVisible(false);
+            if (this[`_aglow_${key}`]) this[`_aglow_${key}`].setVisible(false);
+        }
+
+        // Disable interactables for everything already collected
+        for (const obj of this.interactables) {
+            if (this.collected.has(obj.id)) obj.disabled = true;
+        }
+
+        // Restore open gate
+        if (this._gateOpen) {
+            if (this._gateBody)     this._gateBody.body.enable = false;
+            if (this._gateGfx)      this._gateGfx.setVisible(false);
+            if (this._gateLockGfx)  this._gateLockGfx.setVisible(false);
+        }
     }
