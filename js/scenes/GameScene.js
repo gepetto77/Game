@@ -7,7 +7,7 @@ class GameScene extends Phaser.Scene {
     constructor() { super({ key: 'GameScene' }); }
 
     create() {
-        const W = 1600, H = 1200;
+        const W = 2400, H = 1800;
 
         this.collected         = new Set();
         this._gateOpen         = false;
@@ -31,10 +31,13 @@ class GameScene extends Phaser.Scene {
         this.obstacles = this.physics.add.staticGroup();
 
         this._createCabin();
+        this._createRegistrationOffice();
         this._createShed();
+        this._createBathHouse();
         this._createTrees();
         this._createFence();
         this._createBushes();
+        this._createRocks();
         this._createStumps();
 
         this._createPlayer();
@@ -49,19 +52,23 @@ class GameScene extends Phaser.Scene {
         this.quest    = new QuestTracker(this);
 
         this._createLakeShore();
+        this._createDock();
+
+        // Named camp sites
+        this._createCampsiteMaple();    // Site A — Ben's camp
+        this._createCampsitePine();     // Site B — Hamilton family
+        this._createCampsiteBirch();    // Site C — Harold
+        this._createCampsiteCedar();    // Site D — Mia
+        this._createCampsiteOak();      // Site E — Group / Counselor
+        this._createCampsiteWillow();   // Site F — Frank's wilderness
+
+        this._createIceCreamShack();
+        this._createRecArea();
+        this._createBulletinBoard();
         this._createDad();
         this._createSpecialStick();
-        this._createIceCreamShack();
-        this._createBulletinBoard();
-        this._createFranksCamp();
-        this._createCounselor();
-        this._createGoofyKid();
-        this._createCampfire();
-        this._createTent();
-        this._createSign();
         this._createGlowingClue();
         this._createBoltCutters();
-        this._createPicnicTable();
         this._createControlPanel();
 
         this._buildInteractables();
@@ -213,34 +220,34 @@ class GameScene extends Phaser.Scene {
     _buildInteractables() {
         this.interactables = [
             {
-                id: 'campfire', x: 500, y: 470, range: 65, hintLabel: 'Examine',
+                id: 'campfire', x: 352, y: 479, range: 65, hintLabel: 'Examine',
                 speaker: '',
                 text: '...The fire is still going. Ash not yet cold. Someone lit this recently.'
             },
             {
-                id: 'mug', x: 460, y: 500, range: 50, hintLabel: 'Examine',
+                id: 'mug', x: 318, y: 498, range: 50, hintLabel: 'Examine',
                 speaker: '',
                 text: 'A tin mug, still half-full of coffee. Cold now. Whoever left this didn\'t plan to be gone long.'
             },
             {
-                id: 'tent', x: 340, y: 490, range: 60, hintLabel: 'Look inside',
+                id: 'tent', x: 282, y: 435, range: 60, hintLabel: 'Look inside',
                 speaker: '',
                 text: 'A small camping tent. Sleeping bag inside, unzipped. A flashlight, dead batteries. Nobody\'s been back to this.'
             },
             {
-                id: 'cabin', x: 155, y: 232, range: 60, hintLabel: 'Try door',
+                id: 'cabin', x: 147, y: 376, range: 60, hintLabel: 'Try door',
                 getSpeaker: () => '',
                 getText: (s) => s.collected.has('bolt_cutters')
                     ? 'The cabin is padlocked — a keyed lock. The bolt cutters won\'t fit.'
                     : 'Padlocked. A hand-painted sign: RANGERS ONLY.\nThe curtains inside are drawn.'
             },
             {
-                id: 'shed', x: 170, y: 900, range: 60, hintLabel: 'Examine',
+                id: 'shed', x: 118, y: 1088, range: 60, hintLabel: 'Examine',
                 speaker: '',
                 text: 'A maintenance shed. Locked. Through the gap you can see tools, rope, a few paint cans.'
             },
             {
-                id: 'bolt_cutters', x: 240, y: 960, range: 80, hintLabel: 'Take',
+                id: 'bolt_cutters', x: 186, y: 1138, range: 80, hintLabel: 'Take',
                 getSpeaker: () => '',
                 getText: () => 'Heavy bolt cutters leaning against the shed wall. Red grips, rusted jaw. These could cut a padlock.',
                 onInteract: (s) => {
@@ -253,17 +260,17 @@ class GameScene extends Phaser.Scene {
                 }
             },
             {
-                id: 'picnic_note', x: 720, y: 548, range: 60, hintLabel: 'Read note',
+                id: 'picnic_note', x: 610, y: 745, range: 60, hintLabel: 'Read note',
                 speaker: 'NOTE',
                 text: '"Marcus — stay at site 4 until I get back.\nChecked Sector 7 this morning. Something\'s wrong with the east containment wall.\nDon\'t touch anything. — R.D."'
             },
             {
-                id: 'sign', x: 820, y: 510, range: 65, hintLabel: 'Read',
+                id: 'sign', x: 1830, y: 748, range: 65, hintLabel: 'Read',
                 speaker: 'SIGN',
                 text: 'DANGER — RADIATION\nRESTRICTED AREA — PINEBROOK NUCLEAR RESERVE\nNo trespassing. Authorized personnel only.'
             },
             {
-                id: 'glowing_clue', x: 870, y: 650, range: 72, hintLabel: '???',
+                id: 'glowing_clue', x: 1848, y: 842, range: 72, hintLabel: '???',
                 getSpeaker: () => '???',
                 getText: (s) => s.quest.atLeast('NEED_TOOL')
                     ? 'The cylinder still hums. A hazard symbol on the casing. Whatever is leaking from inside that fence has been leaking a while.'
@@ -271,7 +278,7 @@ class GameScene extends Phaser.Scene {
                 onInteract: (s) => { if (!s.quest.atLeast('NEED_TOOL')) s.quest.advance(QUEST_STATES.NEED_TOOL); }
             },
             {
-                id: 'gate', x: 950, y: 580, range: 55, hintLabel: 'Examine',
+                id: 'gate', x: 1876, y: 834, range: 55, hintLabel: 'Examine',
                 getSpeaker: () => '',
                 getText: (s) => s.collected.has('bolt_cutters')
                     ? 'You slip the jaws around the shackle and squeeze.\n*SNAP*\nThe padlock drops. The gate groans open.'
@@ -279,13 +286,13 @@ class GameScene extends Phaser.Scene {
                 onInteract: (s) => { if (!s._gateOpen && s.collected.has('bolt_cutters')) s._openGate(); }
             },
             {
-                id: 'worker_badge', x: 1100, y: 660, range: 60, hintLabel: 'Examine',
+                id: 'worker_badge', x: 1940, y: 876, range: 60, hintLabel: 'Examine',
                 speaker: 'ID BADGE',
                 text: 'PINEBROOK NUCLEAR RESERVE\nEMPLOYEE: MARCUS COLE\nID: NR-4471  CLEARANCE: LEVEL 2\n\n[EXPIRED]'
             },
             // ---- Dad + walking stick quest ----
             {
-                id: 'dad', x: 515, y: 548, range: 70, hintLabel: 'Talk to Dad',
+                id: 'dad', x: 348, y: 496, range: 70, hintLabel: 'Talk to Dad',
                 speaker: 'DAD',
                 getText: (s) => {
                     if (s.collected.has('walking_stick'))
@@ -312,7 +319,7 @@ class GameScene extends Phaser.Scene {
                 }
             },
             {
-                id: 'special_stick', x: 388, y: 248, range: 60, hintLabel: 'Pick up',
+                id: 'special_stick', x: 166, y: 338, range: 60, hintLabel: 'Pick up',
                 speaker: '',
                 getText: (s) => s.collected.has('stick_raw') || s.collected.has('walking_stick')
                     ? '(You already have the good stick.)'
@@ -328,12 +335,12 @@ class GameScene extends Phaser.Scene {
             },
             // ---- NPCs & world objects ----
             {
-                id: 'bulletin_board', x: 490, y: 415, range: 70, hintLabel: 'Read board',
+                id: 'bulletin_board', x: 456, y: 602, range: 70, hintLabel: 'Read board',
                 speaker: 'BULLETIN BOARD',
                 text: 'PINEBROOK CAMPGROUND — WELCOME!\n\nSite Map posted at the entrance.\nReport wildlife sightings to the ranger cabin.\n\n[handwritten sticky note]\n"Has anyone seen my bolt cutters?\nLeft them leaning by the shed. — SITE 4"'
             },
             {
-                id: 'counselor', x: 420, y: 380, range: 65, hintLabel: 'Talk',
+                id: 'counselor', x: 882, y: 1042, range: 65, hintLabel: 'Talk',
                 speaker: 'COUNSELOR DANA',
                 getText: (s) => s.quest.atLeast('INSIDE')
                     ? 'I don\'t know how you got in there. Please stay safe — that fence is posted for a reason.'
@@ -342,28 +349,63 @@ class GameScene extends Phaser.Scene {
                     : 'Welcome to Pinebrook! Explore, have fun, but stay out of the restricted zone past the east fence. Seriously.'
             },
             {
-                id: 'goofy_kid', x: 560, y: 535, range: 60, hintLabel: 'Talk',
+                id: 'goofy_kid', x: 960, y: 1014, range: 60, hintLabel: 'Talk',
                 speaker: 'KID',
                 getText: (s) => s.quest.atLeast('DISCOVERED_CLUE')
                     ? 'See? Told you something was out there! You should find a way past that fence...'
                     : 'Dude. Last night, around 2am, I saw this green glow by the east fence.\nMy parents said I was dreaming. I wasn\'t dreaming.'
             },
             {
-                id: 'fisherman', x: 490, y: 1110, range: 75, hintLabel: 'Talk',
+                id: 'fisherman', x: 2038, y: 678, range: 75, hintLabel: 'Talk',
                 speaker: 'OLD PETE',
                 getText: (s) => s.quest.atLeast('INSIDE')
                     ? 'You found something in there, didn\'t you. I can see it in your face.\nSame look I had in \'89.'
                     : 'Been fishin\' this lake forty years. Used to be you could eat what you caught.\n...Not anymore.'
             },
             {
-                id: 'ice_cream', x: 350, y: 345, range: 65, hintLabel: 'Order',
+                id: 'ice_cream', x: 1058, y: 1770, range: 65, hintLabel: 'Order',
                 speaker: 'MRS. DOTTIE',
                 getText: (s) => s.collected.has('bolt_cutters')
                     ? 'Back again? You look like you\'ve been busy. The Fudge Avalanche is on me. You\'ve earned it!'
                     : 'What\'ll it be, sweetheart? We\'ve got Fudge Avalanche, Maple Melt, Campfire Crunch... and the Sasquatch Surprise — though I can\'t promise what\'s in it.'
             },
+            // ---- New NPCs (expanded cast) ----
             {
-                id: 'frank_campfire', x: 668, y: 795, range: 80, hintLabel: 'Approach fire',
+                id: 'reg_clerk', x: 432, y: 650, range: 65, hintLabel: 'Talk',
+                speaker: 'CAMP CLERK',
+                getText: (s) => s.quest.atLeast('INSIDE')
+                    ? 'The ranger still hasn\'t checked in. Filing a report today.\nWhatever you found in there — please be careful.'
+                    : 'Welcome to Pinebrook! Maps at the desk. Oh — Ranger Thompson hasn\'t checked in for two days.\nProbably on patrol... probably.'
+            },
+            {
+                id: 'dave_hamilton', x: 802, y: 466, range: 65, hintLabel: 'Talk',
+                speaker: 'DAVE (SITE B)',
+                getText: (s) => s.quest.atLeast('INSIDE')
+                    ? 'You were inside that compound?\nMy wife\'s been getting headaches all week. The water here isn\'t right.\nIf you found proof — make sure people know.'
+                    : s.quest.atLeast('DISCOVERED_CLUE')
+                    ? 'You noticed that fence too? The metallic taste in the water started the day we arrived.\nKids won\'t drink it now. Something is wrong here.'
+                    : 'Beautiful spot, but my kids won\'t drink the tap water.\nTastes metallic. Thought it was old pipes at first.'
+            },
+            {
+                id: 'harold', x: 1252, y: 432, range: 65, hintLabel: 'Talk',
+                speaker: 'HAROLD',
+                getText: (s) => s.quest.atLeast('INSIDE')
+                    ? 'You got in there? Lord.\nWhatever you found — write it down and get it out.\nDon\'t let them bury it again.'
+                    : s.quest.atLeast('NEED_TOOL')
+                    ? 'Trying to get past that fence? I tried in \'92.\nThey had a man watching. Be careful.\nThis was public land until 1989 — they signed it away overnight.'
+                    : 'Name\'s Harold. Retired ranger — twenty-two years on this route.\nIn 1989 they told me the east section was "private leasehold." Overnight.\nFish started dying that summer.'
+            },
+            {
+                id: 'mia', x: 1712, y: 458, range: 65, hintLabel: 'Talk',
+                speaker: 'MIA',
+                getText: (s) => s.quest.atLeast('INSIDE')
+                    ? 'You actually went in. I knew it.\nI wrote down everything — the workers, the lake readings.\nI\'ll back you up if you need a witness.'
+                    : s.quest.atLeast('DISCOVERED_CLUE')
+                    ? 'That glow? I think it\'s Cherenkov radiation.\nLeaks from certain reactor-adjacent materials.\nMy chemistry teacher would call this a serious incident.'
+                    : 'I heard facility workers talking last night.\nThey didn\'t see me.\n"Evacuation window." "They\'ll never check the lake readings."\nI wrote it all down.'
+            },
+            {
+                id: 'frank_campfire', x: 270, y: 1634, range: 80, hintLabel: 'Approach fire',
                 speaker: 'OLD FRANK',
                 getText: (s) => {
                     const n = s._artifactCounts.arrowheads + s._artifactCounts.pottery + s._artifactCounts.tools;
@@ -397,7 +439,7 @@ class GameScene extends Phaser.Scene {
                 }
             },
             {
-                id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Access terminal',
+                id: 'control_panel', x: 2120, y: 1160, range: 70, hintLabel: 'Access terminal',
                 speaker: 'TERMINAL',
                 getText: (s) => {
                     if (s._endingPlayed) return '[SIGNAL LOST]\n[SIGNAL LOST]\n[SIGNAL LOST]';
@@ -412,7 +454,7 @@ class GameScene extends Phaser.Scene {
         ];
 
         this._autoQuestZones = [{
-            x: 720, y: 360, w: 200, h: 500,
+            x: 1600, y: 680, w: 300, h: 1120,
             questState: QUEST_STATES.DISCOVERED_CLUE, triggered: false
         }];
     }
@@ -437,48 +479,122 @@ class GameScene extends Phaser.Scene {
     _createGround(w, h) {
         const g = this.add.graphics();
 
-        // Base grass — earthy mid-green matching reference
-        g.fillStyle(0x3d6b2e);
-        g.fillRect(0, 0, w, h);
+        // ---- Base grass ----
+        g.fillStyle(0x3d6b2e); g.fillRect(0, 0, w, h);
 
-        // Darker patches for natural variation
-        const dark = [[60,200,130,90],[350,85,170,75],[570,210,120,90],[770,310,130,85],[940,115,110,75],
-            [210,720,140,85],[500,840,120,105],[700,975,125,85],[1060,190,145,95],[1250,390,115,85],[1440,700,105,90],[390,1055,155,75]];
+        // Darker variation patches
         g.fillStyle(0x2d5a22);
-        for (const [px,py,pw,ph] of dark) g.fillRect(px,py,pw,ph);
+        [[80,200,180,110],[420,120,200,100],[720,280,160,120],[1050,180,190,110],
+         [1380,340,170,100],[1700,200,160,120],[2050,600,180,110],[2250,350,140,100],
+         [300,1200,190,120],[620,1450,170,110],[950,1060,160,100],[1350,1200,180,120],
+         [1700,1500,160,110],[400,800,140,90],[800,900,150,100],[1600,900,140,100]
+        ].forEach(([x,y,pw,ph]) => g.fillRect(x,y,pw,ph));
 
-        // Light highlight patches
+        // Lighter highlight patches
         g.fillStyle(0x4a7a35);
-        [[180,380,80,50],[450,260,70,45],[750,180,90,55],[600,650,80,50],[1100,500,90,55]].forEach(
-            ([px,py,pw,ph]) => g.fillRect(px,py,pw,ph));
+        [[220,580,100,60],[560,820,110,65],[1000,740,100,60],[1450,700,110,65],
+         [800,1180,100,60],[1200,1100,90,55],[600,400,90,55],[1600,500,100,60]
+        ].forEach(([x,y,pw,ph]) => g.fillRect(x,y,pw,ph));
 
-        // Dirt paths — sandy beige (matching reference ground colour)
-        g.fillStyle(0x8b7355);
-        g.fillRect(80, 560, 870, 44);    // main E-W path
-        g.fillRect(140, 235, 44, 325);   // N branch to cabin
-        g.fillRect(140, 604, 44, 355);   // S branch to shed
-        g.fillRect(184, 432, 270, 44);   // campfire spur
+        // ---- Dense forest zones (corners) ----
+        g.fillStyle(0x1e3818);
+        g.fillRect(0, 0, 380, 430);       // NW forest behind cabin
+        g.fillRect(0, 1500, 55, 300);     // SW forest edge (beside cave trail)
+        g.fillStyle(0x223820);
+        g.fillRect(2050, 0, 350, 580);    // NE forest above lake
 
-        // Path edges — slightly lighter to give depth
-        g.fillStyle(0x9a8465, 0.5);
-        g.fillRect(80, 558, 870, 4);
-        g.fillRect(80, 600, 870, 4);
+        // ---- DIRT PATHS (sandy beige) ----
+        const dirt = 0x8b7355, dirtE = 0x9a8465;
 
-        // Inside fence — subtly wrong-feeling green
-        g.fillStyle(0x2c4228);
-        g.fillRect(952, 344, 546, 716);
+        g.fillStyle(dirt);
+        // Main N spine road (primary E-W artery)
+        g.fillRect(60, 680, 1860, 44);
+        // Main S loop road
+        g.fillRect(60, 1380, 1800, 44);
+        // West N-S connector (left side of loop)
+        g.fillRect(60, 680, 44, 744);
+        // Center N-S cross road
+        g.fillRect(950, 680, 44, 744);
+        // Cabin spur (north from main road to cabin)
+        g.fillRect(60, 440, 44, 244);
+        // Lake trail (east from main road to lake shore)
+        g.fillRect(1860, 590, 260, 40);
+        // Cave trail (south from loop-bottom, follows west road down)
+        g.fillRect(60, 1424, 44, 380);
+        // Rec spur (south from center cross to ice cream + rec area)
+        g.fillRect(950, 1424, 44, 340);
+        // Frank's spur (south-west branch to wilderness camp)
+        g.fillRect(200, 1424, 44, 220);
+        // Campsite spurs (short N paths from main road to each site)
+        g.fillRect(290, 490, 44, 194);   // Maple spur
+        g.fillRect(755, 490, 44, 194);   // Pine spur
+        g.fillRect(1210, 490, 44, 194);  // Birch spur
+        g.fillRect(1670, 490, 44, 194);  // Cedar spur
 
-        // Contamination near control panel (purple-grey tint)
-        g.fillStyle(0x2a2836);
-        g.fillRect(1100, 480, 250, 210);
+        // Path edge highlights
+        g.fillStyle(dirtE, 0.35);
+        g.fillRect(60, 678, 1860, 4);    // N road top edge
+        g.fillRect(60, 720, 1860, 4);    // N road bottom edge
+        g.fillRect(60, 1378, 1800, 4);   // S road top edge
+        g.fillRect(60, 1420, 1800, 4);   // S road bottom edge
 
-        // Yellowing grass right by fence (decay marker)
-        g.fillStyle(0x4e5e28);
-        g.fillRect(858, 490, 92, 330);
+        // Gravel clearings at main junctions
+        g.fillStyle(0x7a6848, 0.6);
+        g.fillEllipse(104, 702, 60, 40); // W junction
+        g.fillEllipse(994, 702, 60, 40); // Center junction
+        g.fillEllipse(104, 1402, 60, 40); // SW junction
+        g.fillEllipse(994, 1402, 60, 40); // S-center junction
 
-        g.fillStyle(0x1e3018);
-        g.fillRect(0, 1152, w, 48);
+        // ---- LAKE (north-east) ----
+        g.fillStyle(0x1e5a8a); g.fillRect(1860, 60, 520, 640);
+        // Shoreline shallows (lighter near edges)
+        g.fillStyle(0x2e7aaa, 0.6); g.fillRect(1860, 60, 520, 40);
+        g.fillStyle(0x2e7aaa, 0.5); g.fillRect(1860, 60, 40, 640);
+        // Water shimmer lines
+        g.lineStyle(1, 0x4090cc, 0.25);
+        for (let ry = 100; ry < 680; ry += 50) g.lineBetween(1900, ry, 1900 + 80 + (ry % 100), ry + 4);
+        // Dark deep zone
+        g.fillStyle(0x12395a, 0.5); g.fillRect(1980, 130, 340, 400);
+        // Sandy beach strip
+        g.fillStyle(0xb8a870); g.fillRect(1820, 620, 580, 50);
+        g.fillStyle(0xc8b880, 0.6); g.fillRect(1820, 620, 580, 20);
+
+        // ---- FACILITY ZONE (east, behind fence) ----
+        g.fillStyle(0x283a24); g.fillRect(1860, 760, 540, 1020); // dark wrong-feeling grass
+        g.fillStyle(0x282030); g.fillRect(1960, 1000, 380, 500);  // contamination tint
+        g.fillStyle(0x4a5a20); g.fillRect(1820, 800, 80, 700);    // yellowing at fence edge
+        // Service road inside facility
+        g.fillStyle(0x686054); g.fillRect(1860, 900, 540, 28);
+        g.fillRect(1940, 760, 28, 1020);
+
+        // ---- CREEK (visual only, runs N-S through west-center area) ----
+        g.fillStyle(0x356a80, 0.8);
+        g.fillRect(298, 820, 14, 560);  // N-S segment
+        g.fillRect(298, 820, 180, 14);  // E spur
+        g.fillStyle(0x4a80a0, 0.35);
+        g.fillRect(300, 822, 10, 556);  // inner highlight
+
+        // Creek banks (mud)
+        g.fillStyle(0x6a5a3a, 0.4);
+        g.fillRect(290, 820, 26, 562);
+
+        // ---- ROCKY OUTCROPS near cave trail ----
+        g.fillStyle(0x504840);
+        [[108,1570,55,32],[175,1660,48,28],[240,1730,52,30],[90,1710,44,26]
+        ].forEach(([x,y,rw,rh]) => g.fillEllipse(x+rw/2, y+rh/2, rw, rh));
+
+        // ---- Campsite clearing patches (faint dirt clearing at each site) ----
+        g.fillStyle(0x4a6a30);  // slightly lighter green = mowed clearing
+        [[250,390,170,110],[730,370,170,110],[1185,355,170,110],
+         [1650,370,170,110],[790,970,200,130],[195,1530,160,100]
+        ].forEach(([x,y,pw,ph]) => g.fillEllipse(x+pw/2, y+ph/2, pw, ph));
+
+        // ---- Border strips ----
+        g.fillStyle(0x1a2c14);
         g.fillRect(0, 0, w, 20);
+        g.fillRect(0, h-20, w, 20);
+        g.fillRect(0, 0, 20, h);
+        g.fillRect(w-20, 0, 20, h);
     }
 
     // Draw one player animation frame into a named texture.
@@ -547,43 +663,113 @@ class GameScene extends Phaser.Scene {
         // back: facing up — hair covers face
         this._makePlayerFrame('player_back',  2, 10, false);
 
-        this.player = this.physics.add.sprite(280, 580, 'player_idle');
+        this.player = this.physics.add.sprite(310, 710, 'player_idle');
         this.player.setCollideWorldBounds(true);
         this.player.setDepth(10);
     }
 
     _createCabin() {
-        const x = 80, y = 120, w = 150, h = 110;
+        const x = 70, y = 285, w = 155, h = 120;
         const g = this.add.graphics().setDepth(4);
 
-        g.fillStyle(0x000000, 0.22); g.fillRect(x+8, y+h+2, w, 10);  // shadow
+        g.fillStyle(0x000000, 0.22); g.fillRect(x+8, y+h+2, w, 10);
 
         g.fillStyle(0x7a3d0e); g.fillRect(x, y, w, h);
         g.lineStyle(1, 0x5c2d0a, 0.35);
         for (let yi = y+14; yi < y+h; yi += 14) g.lineBetween(x, yi, x+w, yi);
 
         g.fillStyle(0x4a2009); g.fillRect(x-10, y, w+20, 16);
-        g.fillStyle(0x351506); g.fillTriangle(x-10, y+16, x+w/2, y-28, x+w+10, y+16);
+        g.fillStyle(0x351506); g.fillTriangle(x-10, y+16, x+w/2, y-30, x+w+10, y+16);
 
-        g.fillStyle(0x2a1005); g.fillRect(x+55, y+62, 40, 48);
-        g.fillStyle(0xbbbbbb); g.fillRect(x+71, y+84, 5, 5);
+        g.fillStyle(0x2a1005); g.fillRect(x+55, y+68, 44, 52);
+        g.fillStyle(0xbbbbbb); g.fillRect(x+73, y+90, 6, 6);
 
-        g.fillStyle(0x6699bb); g.fillRect(x+10, y+26, 28, 22); g.fillRect(x+112, y+26, 28, 22);
-        g.lineStyle(2, 0x2a1005,1); g.strokeRect(x+10,y+26,28,22); g.strokeRect(x+112,y+26,28,22);
+        g.fillStyle(0x6699bb); g.fillRect(x+10, y+28, 30, 24); g.fillRect(x+115, y+28, 30, 24);
+        g.lineStyle(2, 0x2a1005, 1); g.strokeRect(x+10,y+28,30,24); g.strokeRect(x+115,y+28,30,24);
+
+        // RANGERS ONLY sign
+        g.fillStyle(0xddaa30); g.fillRect(x+46, y+56, 62, 10);
+        this.add.text(x+77, y+60, 'RANGERS ONLY', {
+            fontSize: '5px', fill: '#2a1005', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+
+        const b = this.obstacles.create(x+w/2, y+h/2, 'pixel');
+        b.setVisible(false); b.setDisplaySize(w,h); b.body.setSize(w,h); b.refreshBody();
+    }
+
+    _createRegistrationOffice() {
+        const x = 375, y = 612, w = 115, h = 90;
+        const g = this.add.graphics().setDepth(4);
+
+        g.fillStyle(0x000000, 0.18); g.fillRect(x+6, y+h+2, w, 9);  // shadow
+
+        // Main body — cream/tan
+        g.fillStyle(0xd4c490); g.fillRect(x, y, w, h);
+        g.lineStyle(1, 0xb8a870, 0.5);
+        for (let yi = y+12; yi < y+h; yi += 12) g.lineBetween(x, yi, x+w, yi);
+
+        // Roof
+        g.fillStyle(0x6a4820); g.fillRect(x-8, y, w+16, 14);
+        g.fillStyle(0x4a3010); g.fillTriangle(x-8, y+14, x+w/2, y-18, x+w+8, y+14);
+
+        // Door
+        g.fillStyle(0x4a3010); g.fillRect(x+42, y+56, 30, 34);
+        g.fillStyle(0xddcc88); g.fillRect(x+68, y+71, 3, 5);
+
+        // Windows
+        g.fillStyle(0x88aacc); g.fillRect(x+8, y+22, 24, 20); g.fillRect(x+83, y+22, 24, 20);
+        g.lineStyle(1, 0x4a3010); g.strokeRect(x+8,y+22,24,20); g.strokeRect(x+83,y+22,24,20);
+        g.lineStyle(1, 0x4a3010, 0.5);
+        g.lineBetween(x+20, y+22, x+20, y+42); g.lineBetween(x+95, y+22, x+95, y+42);
+
+        // Sign above door
+        g.fillStyle(0x225a22); g.fillRect(x+10, y-2, 95, 12);
+        this.add.text(x+57, y+3, 'CAMP REGISTRATION', {
+            fontSize: '5px', fill: '#ccffaa', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
 
         const b = this.obstacles.create(x+w/2, y+h/2, 'pixel');
         b.setVisible(false); b.setDisplaySize(w,h); b.body.setSize(w,h); b.refreshBody();
     }
 
     _createShed() {
-        const x = 110, y = 860, w = 100, h = 80;
+        const x = 66, y = 1046, w = 104, h = 84;
         const g = this.add.graphics().setDepth(3);
         g.fillStyle(0x42280c); g.fillRect(x, y, w, h);
         g.lineStyle(1, 0x2e1a08, 0.7);
         for (let yi = y+12; yi < y+h; yi += 12) g.lineBetween(x, yi, x+w, yi);
         g.fillStyle(0x2a1508); g.fillRect(x-6, y, w+12, 14);
-        g.fillStyle(0x1e1006); g.fillTriangle(x-6, y+14, x+w/2, y-16, x+w+6, y+14);
-        g.fillStyle(0x180c04); g.fillRect(x+34, y+36, 32, 44);
+        g.fillStyle(0x1e1006); g.fillTriangle(x-6, y+14, x+w/2, y-18, x+w+6, y+14);
+        g.fillStyle(0x180c04); g.fillRect(x+34, y+38, 36, 46);
+        // Lock
+        g.fillStyle(0xaaaaaa); g.fillRect(x+49, y+46, 6, 5);
+        g.lineStyle(1, 0x888888); g.strokeCircle(x+52, y+44, 4);
+
+        const b = this.obstacles.create(x+w/2, y+h/2, 'pixel');
+        b.setVisible(false); b.setDisplaySize(w,h); b.body.setSize(w,h); b.refreshBody();
+    }
+
+    _createBathHouse() {
+        const x = 988, y = 1306, w = 88, h = 72;
+        const g = this.add.graphics().setDepth(3);
+        g.fillStyle(0x000000, 0.14); g.fillRect(x+5, y+h+1, w, 8);
+
+        // Cinder block walls
+        g.fillStyle(0xd0cfc8); g.fillRect(x, y, w, h);
+        g.lineStyle(1, 0xb8b7b0, 0.5);
+        for (let yi = y+16; yi < y+h; yi += 16) g.lineBetween(x, yi, x+w, yi);
+        for (let xi = x+22; xi < x+w; xi += 22) g.lineBetween(xi, y, xi, y+h);
+
+        // Roof
+        g.fillStyle(0x888880); g.fillRect(x-4, y, w+8, 12);
+        g.fillStyle(0x666660); g.fillTriangle(x-4, y+12, x+w/2, y-14, x+w+4, y+12);
+
+        // Two doors (M/W)
+        g.fillStyle(0x446644); g.fillRect(x+10, y+40, 28, 32);
+        g.fillStyle(0x336633); g.fillRect(x+50, y+40, 28, 32);
+        g.fillStyle(0xccffcc, 0.7); g.fillRect(x+34, y+26, 20, 12);
+        this.add.text(x+24, y+52, 'M', { fontSize: '9px', fill: '#ccffcc', fontFamily: 'monospace' }).setDepth(5).setOrigin(0.5);
+        this.add.text(x+64, y+52, 'W', { fontSize: '9px', fill: '#ccffcc', fontFamily: 'monospace' }).setDepth(5).setOrigin(0.5);
 
         const b = this.obstacles.create(x+w/2, y+h/2, 'pixel');
         b.setVisible(false); b.setDisplaySize(w,h); b.body.setSize(w,h); b.refreshBody();
@@ -591,18 +777,46 @@ class GameScene extends Phaser.Scene {
 
     _createTrees() {
         [
-            // North border
-            [80,76],[244,60],[404,76],[584,66],[744,74],[904,60],[1084,76],[1264,66],[1434,76],
-            // NW cluster (around cabin)
-            [65,292],[308,160],[66,438],[325,375],
-            // West edge
-            [54,700],[62,924],[67,1092],
-            // South border
-            [202,1110],[424,1094],[644,1114],[824,1096],
-            // Interior scattered
-            [560,295],[698,385],[412,754],[622,820],
-            // Beyond fence (unreachable, mysterious)
-            [1158,176],[1365,156],[1475,316],[1482,908]
+            // North border — dense line
+            [80,54],[168,42],[256,58],[354,44],[452,56],[562,42],[672,58],[782,44],[892,56],
+            [1000,42],[1110,58],[1220,44],[1340,56],[1460,42],[1570,58],[1700,44],[1820,56],
+            // NW dense forest (behind cabin)
+            [38,130],[98,190],[158,140],[218,200],[48,270],[108,250],[168,300],[230,160],
+            [55,380],[110,340],[170,420],[220,340],[38,460],[105,480],[168,510],[228,440],
+            // Cabin spur — trees flanking the path
+            [42,490],[42,558],[42,616],[42,644],
+            // West edge trees
+            [38,740],[38,820],[38,900],[38,980],[38,1060],[38,1140],[38,1220],[38,1300],
+            [38,1450],[38,1520],[38,1600],[38,1680],[38,1750],
+            // Between campsites (north zone between path and top border)
+            [480,130],[540,200],[620,150],[700,130],[820,180],[910,130],[1040,180],[1130,130],
+            [1300,180],[1380,130],[1490,200],[1560,140],[1760,180],[1820,130],
+            // Between Maple and Pine spur
+            [510,360],[548,420],[512,480],
+            // Between Pine and Birch spur
+            [1010,380],[1050,440],[1090,390],
+            // Between Birch and Cedar spur
+            [1480,360],[1530,430],[1490,490],
+            // East of Cedar (beyond lake trail junction)
+            [1820,380],[1820,460],[1820,530],
+            // Interior loop scattered trees
+            [158,780],[158,860],[158,940],[158,1020],
+            [440,800],[480,870],[520,830],[440,960],[490,1000],
+            [740,820],[780,870],[740,950],[790,1000],
+            [1100,800],[1140,870],[1080,940],[1150,1000],
+            [1440,820],[1480,870],[1440,960],[1480,1030],
+            // Center cross flanking trees
+            [900,750],[1050,750],[900,1000],[1050,1000],[900,1200],[1050,1200],[900,1350],[1050,1350],
+            // South of main S road — rec area edges
+            [38,1680],[450,1520],[520,1600],[600,1500],[680,1540],[800,1480],[850,1550],
+            [1100,1480],[1150,1540],[1200,1480],[1350,1500],[1420,1560],[1500,1500],
+            [1550,1480],[1620,1550],[1680,1480],[1740,1540],[1800,1480],
+            // Bottom border
+            [80,1762],[200,1750],[320,1762],[460,1750],[600,1762],[740,1750],[900,1762],
+            [1060,1750],[1200,1762],[1380,1750],[1520,1762],[1680,1750],[1800,1762],
+            // Far east — mysterious trees beyond/inside facility
+            [2150,80],[2250,140],[2300,80],[2200,200],[2350,180],
+            [2100,1800],[2250,1750],[2350,1800],
         ].forEach(([tx,ty]) => this._drawTree(tx, ty));
     }
 
@@ -633,7 +847,14 @@ class GameScene extends Phaser.Scene {
     }
 
     _createBushes() {
-        [[210,545],[345,622],[625,558],[688,485],[526,432],[162,610]].forEach(([bx,by]) => {
+        [
+            [230,740],[380,760],[560,750],[720,760],[880,730],[1040,748],[1200,730],[1360,752],
+            [1560,740],[1720,758],[170,750],[170,840],[170,930],[170,1020],[170,1110],[170,1200],
+            [450,1000],[600,1080],[720,1000],[880,1080],[1100,1020],[1280,980],[1450,1050],
+            [360,1400],[500,1420],[650,1400],[850,1420],[1050,1400],[1250,1420],[1450,1400],
+            [230,1530],[320,1560],[430,1500],[1700,900],[1800,950],[1780,1100],[1800,1200],
+            [350,330],[420,280],[480,330],[200,810],[240,860],[284,800]
+        ].forEach(([bx,by]) => {
             const g = this.add.graphics().setDepth(3);
             g.fillStyle(0x2d6a2a); g.fillCircle(bx, by, 13);
             g.fillStyle(0x358030); g.fillCircle(bx+11, by+3, 11);
@@ -642,8 +863,32 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    _createRocks() {
+        // Rocky outcrops scattered across the world
+        [
+            // Near cave trail (SW)
+            [112,1540,44,26],[184,1620,38,22],[250,1700,46,28],[90,1680,40,24],
+            // Near fence exterior
+            [1780,848],[1780,920],[1780,1050],[1780,1180],[1780,1340],
+            // North forest floor
+            [190,220],[280,280],[350,230],[120,310],[420,350],
+            // Near creek
+            [284,860],[276,960],[286,1040],[278,1120],
+            // Lake shore rocks
+            [1838,638],[1846,656],[1852,672],
+        ].forEach(([rx,ry,rw,rh]) => {
+            if (!rw) { rw = 24 + Math.floor(Math.random()*14); rh = 14 + Math.floor(Math.random()*8); }
+            const g = this.add.graphics().setDepth(3);
+            g.fillStyle(0x5a5248); g.fillEllipse(rx, ry, rw, rh);
+            g.fillStyle(0x7a7068, 0.6); g.fillEllipse(rx-rw*0.12, ry-rh*0.2, rw*0.65, rh*0.55);
+        });
+    }
+
     _createStumps() {
-        [[302,705],[585,825],[454,904]].forEach(([sx,sy]) => {
+        [
+            [165,730],[280,810],[450,880],[620,960],[750,860],[900,1180],[1100,1100],
+            [1280,860],[1460,980],[320,1450],[480,1520],[220,1480]
+        ].forEach(([sx,sy]) => {
             const g = this.add.graphics().setDepth(3);
             g.fillStyle(0x5c3d11); g.fillEllipse(sx, sy, 26, 15);
             g.fillStyle(0x8b5e2a); g.fillEllipse(sx, sy-3, 24, 13);
@@ -653,105 +898,310 @@ class GameScene extends Phaser.Scene {
     }
 
 
+    // ----------------------------------------------------------
+    // CAMPSITE HELPERS + NAMED SITES
+    // ----------------------------------------------------------
+
+    _drawFire(g, fx, fy) {
+        g.fillStyle(0x3a2818); g.fillEllipse(fx, fy+6, 32, 16);           // stone ring
+        for (let i = 0; i < 6; i++) {                                       // logs
+            const a = (i/6)*Math.PI*2;
+            g.fillStyle(0x5a3818); g.fillRect(fx+Math.cos(a)*9-3, fy+Math.sin(a)*5+2, 6, 4);
+        }
+        g.fillStyle(0xff6600, 0.85); g.fillTriangle(fx, fy-6, fx-6, fy+4, fx+6, fy+4);
+        g.fillStyle(0xff9900, 0.7);  g.fillTriangle(fx, fy-3, fx-4, fy+3, fx+4, fy+3);
+        g.fillStyle(0xffdd44, 0.5);  g.fillTriangle(fx, fy-1, fx-2, fy+2, fx+2, fy+2);
+        g.fillStyle(0xff4400, 0.3);  g.fillCircle(fx, fy+1, 10);           // glow
+    }
+
+    _drawTent(g, tx, ty, mainColor, accentColor) {
+        g.fillStyle(0x000000, 0.2); g.fillEllipse(tx, ty+22, 56, 14);       // shadow
+        g.fillStyle(mainColor);
+        g.fillTriangle(tx, ty-24, tx-26, ty+12, tx+26, ty+12);              // front face
+        g.fillStyle(accentColor);
+        g.fillTriangle(tx, ty-24, tx-8, ty+12, tx+8, ty+12);                // centre stripe
+        g.fillStyle(0x1a1200);
+        g.fillRect(tx-7, ty+2, 14, 12);                                      // door
+        g.fillStyle(0x4a3800, 0.5);
+        g.fillRect(tx, ty+2, 7, 12);                                         // door shading
+        // Guy ropes
+        g.lineStyle(1, 0x8a7040, 0.5);
+        g.lineBetween(tx-26, ty+12, tx-34, ty+20);
+        g.lineBetween(tx+26, ty+12, tx+34, ty+20);
+    }
+
+    _drawTable(g, px, py) {
+        g.fillStyle(0x8b5e30);
+        g.fillRect(px-22, py-3, 44, 7);     // tabletop
+        g.fillRect(px-26, py+5, 52, 4);     // bench 1
+        g.fillRect(px-26, py-11, 52, 4);    // bench 2
+        g.fillStyle(0x6b4820);
+        g.fillRect(px-18, py-3, 4, 16);     // legs
+        g.fillRect(px+14, py-3, 4, 16);
+    }
+
+    _drawSiteSign(g, sx, sy, label) {
+        g.fillStyle(0x6b3a10); g.fillRect(sx-1, sy, 3, 18);   // post
+        g.fillStyle(0xd4b870); g.fillRect(sx-20, sy-14, 40, 14);
+        this.add.text(sx, sy-8, label, {
+            fontSize: '6px', fill: '#3a1e06', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+    }
+
+    _createCampsiteMaple() {
+        // Site A — Ben's camp. NW of main road, near cabin spur.
+        const cx = 312, cy = 465;
+        const g = this.add.graphics().setDepth(3);
+        this._drawTent(g, cx-30, cy-30, 0x226688, 0x3388aa);   // blue-grey tent
+        this._drawFire(g, cx+40, cy-10);
+        this._drawTable(g, cx+5, cy+55);
+        this._drawSiteSign(g, cx-5, cy+75, 'SITE A — MAPLE');
+        // Lantern post
+        g.fillStyle(0x6b4820); g.fillRect(cx+75, cy-40, 4, 36);
+        g.fillStyle(0xddcc60, 0.8); g.fillCircle(cx+77, cy-44, 6);
+        this.tweens.add({ targets: g, alpha: {from:0.9,to:1}, yoyo:true, repeat:-1, duration:1800 });
+    }
+
+    _createCampsitePine() {
+        // Site B — Hamilton family. Center-W of north zone.
+        const cx = 777, cy = 445;
+        const g = this.add.graphics().setDepth(3);
+        this._drawTent(g, cx-32, cy-28, 0x884422, 0xaa5533);   // orange tent
+        // Second small tent (kids)
+        g.fillStyle(0xaacc44, 0.9);
+        g.fillTriangle(cx+32, cy-28, cx+14, cy-2, cx+50, cy-2);
+        g.fillStyle(0x1a1200); g.fillRect(cx+28, cy-10, 10, 12);
+        this._drawFire(g, cx+2, cy+18);
+        this._drawTable(g, cx-18, cy+60);
+        this._drawSiteSign(g, cx, cy+80, 'SITE B — PINE');
+        // Clothesline
+        g.lineStyle(1, 0x888870, 0.6);
+        g.lineBetween(cx-50, cy-15, cx+65, cy-15);
+        [[cx-38,cy-16],[cx-20,cy-16],[cx+2,cy-16],[cx+28,cy-16]].forEach(([hx,hy]) => {
+            g.fillStyle(0xcc6644+Math.random()*0x003300|0, 0.7); g.fillRect(hx, hy, 10, 14);
+        });
+    }
+
+    _createCampsiteBirch() {
+        // Site C — Harold, retired ranger. Center of north zone.
+        const cx = 1224, cy = 420;
+        const g = this.add.graphics().setDepth(3);
+        this._drawTent(g, cx-28, cy-26, 0x446644, 0x558855);   // forest green tent
+        this._drawFire(g, cx+36, cy-5);
+        this._drawTable(g, cx+8, cy+52);
+        this._drawSiteSign(g, cx-2, cy+74, 'SITE C — BIRCH');
+        // Old ranger gear: axe leaning on tree stub
+        g.fillStyle(0x5a3010); g.fillRect(cx-60, cy+10, 4, 30);
+        g.fillStyle(0x888888); g.fillTriangle(cx-66, cy+10, cx-56, cy+10, cx-58, cy+25);
+        // Coffee pot on fire grate
+        g.fillStyle(0x333333); g.fillRect(cx+30, cy-15, 12, 14);
+        g.fillStyle(0x555555); g.fillRect(cx+34, cy-20, 4, 6);
+    }
+
+    _createCampsiteCedar() {
+        // Site D — Mia. NE of north zone, near lake trail.
+        const cx = 1683, cy = 445;
+        const g = this.add.graphics().setDepth(3);
+        this._drawTent(g, cx-30, cy-28, 0x8844aa, 0xaa66cc);   // purple tent
+        this._drawFire(g, cx+38, cy-8);
+        this._drawTable(g, cx+4, cy+52);
+        this._drawSiteSign(g, cx-4, cy+74, 'SITE D — CEDAR');
+        // Fairy lights string
+        g.lineStyle(1, 0x888860, 0.5);
+        g.lineBetween(cx-45, cy-20, cx+68, cy-20);
+        for (let lx = cx-40; lx < cx+65; lx += 12) {
+            g.fillStyle(0xffff00, 0.6); g.fillCircle(lx, cy-20, 2);
+        }
+        // Chemistry notebook on table
+        g.fillStyle(0x2244aa); g.fillRect(cx-5, cy+45, 14, 18);
+        g.fillStyle(0xddddff, 0.7);
+        for (let ln = 0; ln < 3; ln++) g.fillRect(cx-2, cy+48+ln*5, 8, 2);
+    }
+
+    _createCampsiteOak() {
+        // Site E — Group campsite / Counselor Dana. Center of main loop.
+        const cx = 860, cy = 1048;
+        const g = this.add.graphics().setDepth(3);
+
+        // Large open shelter
+        g.fillStyle(0x4a3010); g.fillRect(cx-70, cy-60, 6, 50);   // posts
+        g.fillRect(cx+64, cy-60, 6, 50);
+        g.fillRect(cx-70, cy-60, 140, 6);                            // roof beam
+        g.fillStyle(0x6a4018, 0.6); g.fillRect(cx-70, cy-60, 140, 10); // roof
+        // Group fire
+        this._drawFire(g, cx-30, cy+28);
+        // Three picnic tables
+        this._drawTable(g, cx+30, cy-30);
+        this._drawTable(g, cx-35, cy-28);
+        this._drawTable(g, cx+2, cy+65);
+        this._drawSiteSign(g, cx+75, cy-45, 'GROUP SITE E — OAK');
+        // Bulletin board on post
+        g.fillStyle(0x6b4010); g.fillRect(cx-90, cy-30, 4, 40);
+        g.fillStyle(0xddbb88); g.fillRect(cx-102, cy-50, 26, 22);
+        g.fillStyle(0x888860); g.fillRect(cx-100, cy-48, 10, 8); g.fillRect(cx-88, cy-48, 10, 8);
+        g.fillRect(cx-100, cy-38, 10, 8); g.fillRect(cx-88, cy-38, 10, 8);
+    }
+
+    _createCampsiteWillow() {
+        // Site F — Frank's wilderness camp. SW, off cave trail.
+        const cx = 238, cy = 1614;
+        const g = this.add.graphics().setDepth(3);
+
+        // Lean-to shelter instead of dome tent
+        g.fillStyle(0x4a3010); g.fillRect(cx-45, cy-30, 4, 42);   // front post
+        g.fillRect(cx+35, cy-30, 4, 42);
+        g.lineStyle(2, 0x6b4818);
+        g.lineBetween(cx-41, cy-30, cx+39, cy-30);                  // ridge pole
+        g.fillStyle(0x5a3a10, 0.7);                                  // canvas lean-to
+        [[cx-41,cy-30],[cx+39,cy-30],[cx+39,cy+12],[cx-41,cy+12]].forEach((p,i,arr) => {
+            if (i===0) return;
+            const prev = arr[i-1];
+        });
+        g.fillTriangle(cx-41, cy-30, cx-41, cy+12, cx+39, cy-30);
+        g.fillTriangle(cx+39, cy-30, cx+39, cy+12, cx-41, cy+12);
+
+        this._drawFire(g, cx+6, cy+32);
+        this._drawSiteSign(g, cx+50, cy+20, 'SITE F — WILLOW');
+        // Survey map pinned to post
+        g.fillStyle(0xd4c890); g.fillRect(cx-58, cy-28, 18, 24);
+        g.fillStyle(0x888860, 0.6);
+        [[cx-54,cy-24,14,2],[cx-54,cy-20,10,2],[cx-54,cy-16,12,2],[cx-54,cy-12,8,2]
+        ].forEach(([rx,ry,rw,rh]) => g.fillRect(rx,ry,rw,rh));
+        // Artifact crates
+        g.fillStyle(0x6b4010); g.fillRect(cx+50, cy+10, 24, 20);
+        g.fillStyle(0x8b5818); g.fillRect(cx+52, cy+8, 24, 20);
+        g.lineStyle(1, 0x6b4010);
+        g.lineBetween(cx+52, cy+18, cx+76, cy+18);
+        g.lineBetween(cx+64, cy+8, cx+64, cy+28);
+    }
+
+    _createDock() {
+        const dx = 1922, dy = 660;
+        const g  = this.add.graphics().setDepth(3);
+        // Pier planks
+        g.fillStyle(0x8b6030);
+        g.fillRect(dx-14, dy-8, 28, 90);
+        g.fillStyle(0x6b4820);
+        for (let py = dy-4; py < dy+86; py += 14) g.fillRect(dx-14, py, 28, 4);
+        // Pilings
+        g.fillStyle(0x4a2c10);
+        [[dx-10,dy+82],[dx+6,dy+82],[dx-10,dy+60],[dx+6,dy+60]].forEach(([px,py]) => g.fillCircle(px, py, 4));
+        // Rope post
+        g.fillStyle(0x6b4820); g.fillRect(dx+16, dy-8, 5, 30);
+        g.lineStyle(1, 0x8a7040, 0.6);
+        g.lineBetween(dx+18, dy-6, dx+30, dy+2);
+        // Fishing sign
+        g.fillStyle(0xddcc80); g.fillRect(dx-22, dy-26, 44, 16);
+        this.add.text(dx, dy-18, 'FISHING DOCK', {
+            fontSize: '5px', fill: '#3a2010', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+        // Physics body for dock edge/pilings
+        const b = this.obstacles.create(dx, dy+78, 'pixel');
+        b.setVisible(false); b.setDisplaySize(28, 8); b.body.setSize(28, 8); b.refreshBody();
+    }
+
+    _createRecArea() {
+        const rx = 1260, ry = 1742;
+        const g  = this.add.graphics().setDepth(3);
+        // Volleyball net posts + net
+        g.fillStyle(0x4a3810); g.fillRect(rx-50, ry-4, 5, 40); g.fillRect(rx+45, ry-4, 5, 40);
+        g.lineStyle(2, 0xddcc88, 0.8);
+        g.lineBetween(rx-48, ry+4, rx+48, ry+4);
+        g.lineStyle(1, 0xddcc88, 0.4);
+        for (let nx = rx-46; nx < rx+46; nx += 10) g.lineBetween(nx, ry+4, nx+10, ry+30);
+        for (let ny = ry+4; ny < ry+30; ny += 8) g.lineBetween(rx-46, ny, rx+46, ny);
+        // Horseshoe pit
+        g.fillStyle(0x9a8460); g.fillRect(rx+70, ry+10, 36, 28);
+        g.fillStyle(0x7a6440); g.fillRect(rx+72, ry+12, 32, 24);
+        g.fillStyle(0x8a6030); g.fillCircle(rx+88, ry+24, 3); // stake
+        // Ground sign
+        g.fillStyle(0x4a6a30); g.fillRect(rx-70, ry-20, 140, 14);
+        this.add.text(rx, ry-13, 'REC AREA', {
+            fontSize: '7px', fill: '#ccffaa', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5);
+    }
+
     _createFence() {
+        // Fence: left x=1860, top y=760, right x=2370, bottom y=1760
+        // Gate gap on left wall: y=800–868
+        const FL=1860, FT=760, FR=2370, FB=1760;
+        const GT=800, GB=868;  // gate top/bottom
         const g = this.add.graphics().setDepth(4);
 
-        // Fence segments — chain-link style dark gray metal
-        const segments = [
-            // Top rail: y=560, x=840–1490
-            { x1: 840, y1: 560, x2: 1490, y2: 560 },
-            // Right rail: x=1490, y=560–1060
-            { x1: 1490, y1: 560, x2: 1490, y2: 1060 },
-            // Bottom rail: y=1060, x=840–1490
-            { x1: 840, y1: 1060, x2: 1490, y2: 1060 },
-            // Left rail: x=840, y=560–1060 (excluding gate gap 560–620)
-            { x1: 840, y1: 620, x2: 840, y2: 1060 },
-        ];
-
-        // Draw rails
+        // Rails
         g.lineStyle(4, 0x445544, 1);
-        segments.forEach(s => { g.beginPath(); g.moveTo(s.x1, s.y1); g.lineTo(s.x2, s.y2); g.strokePath(); });
+        g.beginPath(); g.moveTo(FL, FT); g.lineTo(FR, FT); g.strokePath(); // top
+        g.beginPath(); g.moveTo(FR, FT); g.lineTo(FR, FB); g.strokePath(); // right
+        g.beginPath(); g.moveTo(FL, FB); g.lineTo(FR, FB); g.strokePath(); // bottom
+        g.beginPath(); g.moveTo(FL, GB); g.lineTo(FL, FB); g.strokePath(); // left (below gate)
 
-        // Fence posts every 80px
+        // Posts every 80px
         g.fillStyle(0x556655);
-        // Top row
-        for (let x = 840; x <= 1490; x += 80) {
-            g.fillRect(x - 3, 555, 6, 18);
-        }
-        // Bottom row
-        for (let x = 840; x <= 1490; x += 80) {
-            g.fillRect(x - 3, 1055, 6, 18);
-        }
-        // Left side posts (skip gate gap)
-        for (let y = 620; y <= 1060; y += 80) {
-            g.fillRect(835, y, 10, 6);
-        }
-        // Right side posts
-        for (let y = 560; y <= 1060; y += 80) {
-            g.fillRect(1485, y, 10, 6);
-        }
+        for (let x = FL; x <= FR; x += 80) { g.fillRect(x-3, FT-5, 6, 18); g.fillRect(x-3, FB-5, 6, 18); }
+        for (let y = GB; y <= FB; y += 80) { g.fillRect(FL-5, y, 10, 6); }
+        for (let y = FT; y <= FB; y += 80) { g.fillRect(FR-5, y, 10, 6); }
 
-        // Cross-hatch mesh pattern on top section (visual only)
-        g.lineStyle(1, 0x3a4a3a, 0.4);
-        for (let x = 840; x < 1490; x += 20) {
-            for (let y = 560; y < 1060; y += 20) {
-                g.beginPath(); g.moveTo(x, y); g.lineTo(x + 20, y + 20); g.strokePath();
-                g.beginPath(); g.moveTo(x + 20, y); g.lineTo(x, y + 20); g.strokePath();
+        // Cross-hatch mesh
+        g.lineStyle(1, 0x3a4a3a, 0.35);
+        for (let x = FL; x < FR; x += 22) {
+            for (let y = FT; y < FB; y += 22) {
+                g.beginPath(); g.moveTo(x, y); g.lineTo(x+22, y+22); g.strokePath();
+                g.beginPath(); g.moveTo(x+22, y); g.lineTo(x, y+22); g.strokePath();
             }
         }
 
-        // Barbed wire top (three dots along rail)
+        // Barbed wire
         g.fillStyle(0x889988, 0.8);
-        for (let x = 860; x <= 1470; x += 40) {
-            g.fillCircle(x, 558, 2);
-        }
+        for (let x = FL+20; x <= FR-20; x += 40) g.fillCircle(x, FT+2, 2);
+
+        // WARNING signs along fence exterior
+        g.fillStyle(0xddbb00);
+        [[FL+60,FT-6],[FL+220,FT-6],[FL+420,FT-6],[FL+620,FT-6]].forEach(([sx,sy]) => {
+            g.fillRect(sx, sy, 50, 12);
+            this.add.text(sx+25, sy+5, '⚠ DANGER', {
+                fontSize: '5px', fill: '#1a1a00', fontFamily: 'monospace'
+            }).setDepth(5).setOrigin(0.5);
+        });
 
         // === Physics bodies ===
-        // Top wall
-        const top = this.obstacles.create(1165, 560, 'pixel');
-        top.setVisible(false); top.setDisplaySize(650, 8); top.body.setSize(650, 8); top.refreshBody();
-        // Right wall
-        const right = this.obstacles.create(1490, 810, 'pixel');
-        right.setVisible(false); right.setDisplaySize(8, 500); right.body.setSize(8, 500); right.refreshBody();
-        // Bottom wall
-        const bot = this.obstacles.create(1165, 1060, 'pixel');
-        bot.setVisible(false); bot.setDisplaySize(650, 8); bot.body.setSize(650, 8); bot.refreshBody();
-        // Left wall upper (above gate)
-        const leftTop = this.obstacles.create(840, 562, 'pixel');
-        leftTop.setVisible(false); leftTop.setDisplaySize(8, 4); leftTop.body.setSize(8, 4); leftTop.refreshBody();
-        // Left wall lower (below gate)
-        const leftBot = this.obstacles.create(840, 840, 'pixel');
-        leftBot.setVisible(false); leftBot.setDisplaySize(8, 440); leftBot.body.setSize(8, 440); leftBot.refreshBody();
+        const mk = (x,y,bw,bh) => {
+            const b = this.obstacles.create(x,y,'pixel');
+            b.setVisible(false); b.setDisplaySize(bw,bh); b.body.setSize(bw,bh); b.refreshBody();
+            return b;
+        };
+        mk(FL+(FR-FL)/2, FT, FR-FL, 8);            // top wall
+        mk(FR, FT+(FB-FT)/2, 8, FB-FT);            // right wall
+        mk(FL+(FR-FL)/2, FB, FR-FL, 8);            // bottom wall
+        mk(FL, (GB+FB)/2, 8, FB-GB);               // left wall below gate
 
-        // Gate visual (will be hidden on open)
+        // Gate visual
         this._gateGfx = this.add.graphics().setDepth(4);
         this._gateGfx.lineStyle(3, 0x889988, 1);
         this._gateGfx.fillStyle(0x445544, 0.5);
-        this._gateGfx.fillRect(836, 562, 8, 58);
-        this._gateGfx.strokeRect(836, 562, 8, 58);
-        // Gate cross bar
+        this._gateGfx.fillRect(FL-4, GT, 8, GB-GT);
+        this._gateGfx.strokeRect(FL-4, GT, 8, GB-GT);
         this._gateGfx.lineStyle(2, 0x889988, 0.6);
-        this._gateGfx.beginPath(); this._gateGfx.moveTo(836, 562); this._gateGfx.lineTo(844, 620); this._gateGfx.strokePath();
-        this._gateGfx.beginPath(); this._gateGfx.moveTo(844, 562); this._gateGfx.lineTo(836, 620); this._gateGfx.strokePath();
+        this._gateGfx.beginPath(); this._gateGfx.moveTo(FL-4, GT); this._gateGfx.lineTo(FL+4, GB); this._gateGfx.strokePath();
+        this._gateGfx.beginPath(); this._gateGfx.moveTo(FL+4, GT); this._gateGfx.lineTo(FL-4, GB); this._gateGfx.strokePath();
 
-        // Gate lock icon
+        // Gate lock
         this._gateLockGfx = this.add.graphics().setDepth(5);
         this._gateLockGfx.fillStyle(0xd4a040);
-        this._gateLockGfx.fillRect(838, 587, 8, 7);
+        const lx = FL-2, ly = GT+(GB-GT)/2;
+        this._gateLockGfx.fillRect(lx, ly, 8, 7);
         this._gateLockGfx.lineStyle(2, 0xd4a040);
-        this._gateLockGfx.strokeCircle(842, 587, 4);
+        this._gateLockGfx.strokeCircle(lx+4, ly, 4);
 
-        // Gate physics body (stored so we can disable it on open)
-        this._gateBody = this.obstacles.create(840, 591, 'pixel');
+        // Gate body
+        this._gateBody = this.obstacles.create(FL, GT+(GB-GT)/2, 'pixel');
         this._gateBody.setVisible(false);
-        this._gateBody.setDisplaySize(8, 58);
-        this._gateBody.body.setSize(8, 58);
+        this._gateBody.setDisplaySize(8, GB-GT);
+        this._gateBody.body.setSize(8, GB-GT);
         this._gateBody.refreshBody();
-
     }
 
     _createCampfire() {
-        const cx = 500, cy = 472;
+        const cx = 352, cy = 479;  // Ben's fire at Maple campsite
 
         const g = this.add.graphics().setDepth(3);
         // Stone ring
@@ -798,7 +1248,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createSign() {
-        const sx = 820, sy = 512;
+        const sx = 1830, sy = 750;
         const g = this.add.graphics().setDepth(4);
 
         // Post
@@ -837,7 +1287,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createGlowingClue() {
-        const cx = 870, cy = 655;
+        const cx = 1848, cy = 842;
 
         // Glow halo
         this._clueGlow = this.add.graphics().setDepth(3);
@@ -882,7 +1332,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createBoltCutters() {
-        const bx = 240, by = 962;
+        const bx = 186, by = 1140;
         this._boltCuttersGfx = this.add.graphics().setDepth(4);
         const g = this._boltCuttersGfx;
 
@@ -951,7 +1401,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createControlPanel() {
-        const cx = 1200, cy = 582;
+        const cx = 2120, cy = 1162;
         const g = this.add.graphics().setDepth(4);
 
         // Main housing — dark metal console
@@ -994,7 +1444,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createTent() {
-        const tx = 340, ty = 495;
+        const tx = 282, ty = 435;  // Ben's tent at Maple campsite
         const g = this.add.graphics().setDepth(3);
 
         // Ground shadow
@@ -1143,7 +1593,7 @@ class GameScene extends Phaser.Scene {
     // ---- NEW MAP SECTIONS ----------------------------------------
 
     _createIceCreamShack() {
-        const sx = 310, sy = 290;
+        const sx = 1008, sy = 1725;
         const g = this.add.graphics().setDepth(4);
 
         // Shadow
@@ -1183,52 +1633,33 @@ class GameScene extends Phaser.Scene {
     }
 
     _createLakeShore() {
-        const g = this.add.graphics().setDepth(1);
-
-        // Lake body — deep blue-green
-        g.fillStyle(0x1a5f8a);
-        g.fillRect(80, 1040, 620, 140);
-
-        // Shallows (lighter near edge)
-        g.fillStyle(0x2a7aaa, 0.6);
-        g.fillRect(80, 1040, 620, 25);
-        g.fillRect(80, 1150, 620, 10);
-
-        // Shoreline sand strip
-        g.fillStyle(0xc8a86e);
-        g.fillRect(80, 1032, 620, 14);
-
-        // Water ripple lines (animated in update would be complex — static for now)
-        g.lineStyle(1, 0x3a8fbf, 0.3);
-        for (let y = 1058; y < 1170; y += 18) {
-            for (let x = 100; x < 680; x += 60) {
-                g.beginPath(); g.moveTo(x, y); g.lineTo(x + 30, y); g.strokePath();
-            }
+        // Lake body is drawn in _createGround(). This adds Old Pete + shore details.
+        const g = this.add.graphics().setDepth(2);
+        // Animated ripple shimmer on lake
+        g.fillStyle(0x4a90cc, 0.12);
+        for (let ry = 100; ry < 660; ry += 60) {
+            g.fillRect(1870, ry, 60 + (ry % 80), 6);
         }
-
-        // Dock
-        g.fillStyle(0x8b5e20);
-        g.fillRect(340, 1032, 8, 55);    // left post
-        g.fillRect(410, 1032, 8, 55);    // right post
-        g.fillRect(330, 1035, 100, 8);   // deck plank 1
-        g.fillRect(330, 1048, 100, 8);   // deck plank 2
-        g.fillRect(330, 1061, 100, 8);   // deck plank 3
-
-        // Old Pete (fisherman figure at end of dock)
+        // Shore reeds along beach
+        g.lineStyle(2, 0x4a6030, 0.7);
+        [[1828,640],[1834,630],[1840,638],[1848,628],[1858,636],[1865,625],[1872,634]].forEach(([rx,ry]) => {
+            g.beginPath(); g.moveTo(rx, ry+20); g.lineTo(rx+2, ry); g.strokePath();
+        });
+        // Old Pete fisherman figure at dock
+        const fx = 2024, fy = 668;
         const fg = this.add.graphics().setDepth(5);
-        fg.fillStyle(0x3a5a3a); fg.fillRect(375, 1058, 10, 20); // body
-        fg.fillStyle(0xe8c090); fg.fillRect(376, 1050, 8, 9);    // head
-        fg.fillStyle(0x4a3010); fg.fillRect(373, 1048, 14, 4);   // hat brim
-        fg.fillStyle(0x1a2a1a); fg.fillRect(374, 1044, 11, 5);   // hat top
-        // Fishing rod
+        fg.fillStyle(0x3a5a3a); fg.fillRect(fx, fy, 10, 20);
+        fg.fillStyle(0xe8c090); fg.fillRect(fx+1, fy-8, 8, 9);
+        fg.fillStyle(0x4a3010); fg.fillRect(fx-2, fy-10, 14, 4);
+        fg.fillStyle(0x1a2a1a); fg.fillRect(fx, fy-14, 11, 5);
         fg.lineStyle(1, 0x6b3a18);
-        fg.beginPath(); fg.moveTo(385, 1056); fg.lineTo(395, 1020); fg.strokePath();
+        fg.beginPath(); fg.moveTo(fx+10, fy+2); fg.lineTo(fx+34, fy-30); fg.strokePath();
         fg.lineStyle(1, 0x888888, 0.5);
-        fg.beginPath(); fg.moveTo(395, 1020); fg.lineTo(400, 1050); fg.strokePath();
+        fg.beginPath(); fg.moveTo(fx+34, fy-30); fg.lineTo(fx+42, fy+2); fg.strokePath();
     }
 
     _createBulletinBoard() {
-        const bx = 490, by = 370;
+        const bx = 456, by = 602;
         const g = this.add.graphics().setDepth(4);
 
         // Post
@@ -1307,7 +1738,7 @@ class GameScene extends Phaser.Scene {
 
     _createCounselor() {
         // Camp counselor NPC figure near bulletin board area
-        const cx = 422, cy = 352;
+        const cx = 880, cy = 1038;
         const g = this.add.graphics().setDepth(5);
 
         // Body (green camp shirt)
@@ -1352,7 +1783,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createDad() {
-        const dx = 515, dy = 528;
+        const dx = 348, dy = 496;
         const g = this.add.graphics().setDepth(5);
 
         // Ground shadow
@@ -1388,7 +1819,7 @@ class GameScene extends Phaser.Scene {
     }
 
     _createSpecialStick() {
-        const sx = 388, sy = 248;
+        const sx = 166, sy = 338;
         this._stickRawGfx = this.add.graphics().setDepth(4);
         const g = this._stickRawGfx;
 
@@ -1443,20 +1874,27 @@ class GameScene extends Phaser.Scene {
     // ----------------------------------------------------------
 
     _createArtifacts() {
-        // Arrowheads — dark flint triangles (6 total)
+        // Arrowheads (6) — spread across the larger world
         [
-            [185, 448], [432, 684], [596, 350],
-            [330, 916], [546, 1054], [674, 476]
+            [165, 432],   // NW forest near cabin
+            [492, 760],   // south of main road, west
+            [670, 558],   // mid-north zone
+            [448, 1456],  // SW area near Frank's camp
+            [1784, 896],  // outside facility fence
+            [2192, 1284]  // inside facility (needs gate open)
         ].forEach(([x, y], i) => this._placeArtifact(x, y, 'arrowhead', i));
 
-        // Pottery shards — curved reddish clay (3 total)
+        // Pottery shards (3) — lakes, trails, camp areas
         [
-            [158, 746], [476, 284], [726, 628]
+            [204, 750],   // near creek
+            [1014, 768],  // center camp area
+            [2022, 386]   // lake shore NE
         ].forEach(([x, y], i) => this._placeArtifact(x, y, 'pottery', i));
 
-        // Stone tools — green-gray scrapers (2 total)
+        // Stone tools (2) — cave trail and south camp
         [
-            [296, 1096], [618, 172]
+            [318, 1482],  // cave trail area
+            [668, 1148]   // south loop area
         ].forEach(([x, y], i) => this._placeArtifact(x, y, 'tool', i));
     }
 
@@ -1534,7 +1972,7 @@ class GameScene extends Phaser.Scene {
     // ----------------------------------------------------------
 
     _createCaveEntrance() {
-        const cx = 92, cy = 692;
+        const cx = 130, cy = 1762;
         const g = this.add.graphics().setDepth(3);
 
         // Hillside / rocky outcrop
@@ -1611,7 +2049,7 @@ class GameScene extends Phaser.Scene {
             gateOpen:      this._gateOpen,
             endingPlayed:  this._endingPlayed,
             // Return player near cave entrance
-            playerX: 185, playerY: 800
+            playerX: 188, playerY: 1740
         };
     }
 
@@ -1628,9 +2066,9 @@ class GameScene extends Phaser.Scene {
         // Restore quest display (QuestTracker was already created fresh)
         if (gs.questState > 0) {
             this.quest.state = gs.questState;
-            const label = ['Explore the campground','Investigate the glow near the fence',
-                'Gate is locked. Check the shed south of camp for tools',
-                'Use the bolt cutters on the fence gate','Find the source of the signal'][gs.questState] || '';
+            const label = ['Explore Pinebrook Campground','Investigate the glow near the east fence',
+                'Gate is locked. Check the shed on the west path for tools',
+                'Use the bolt cutters on the facility gate','Find the source of the signal'][gs.questState] || '';
             if (label) { this.quest.label.setText(label); this.quest._drawBg(label); }
         }
 
