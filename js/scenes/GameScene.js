@@ -1134,7 +1134,6 @@ class GameScene extends Phaser.Scene {
         }
         if (!down) this._actionWasPressed = false;
     }
-}
 
     // ---- NEW MAP SECTIONS ----------------------------------------
 
@@ -1667,3 +1666,4 @@ class GameScene extends Phaser.Scene {
             if (this._gateLockGfx)  this._gateLockGfx.setVisible(false);
         }
     }
+}
