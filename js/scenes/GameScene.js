@@ -399,10 +399,15 @@ class GameScene extends Phaser.Scene {
             {
                 id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Access terminal',
                 speaker: 'TERMINAL',
-                getText: (s) => s._endingPlayed
-                    ? '[SIGNAL LOST]\n[SIGNAL LOST]\n[SIGNAL LOST]'
-                    : 'PINEBROOK NUCLEAR RESERVE\nFACILITY LOG — SECTOR 7\n\nBreach: coolant line fracture\nDay 14 — Status: UNRESOLVED\n[Press again to continue...]',
-                onInteract: (s) => { if (!s._endingPlayed) s._triggerEnding(); }
+                getText: (s) => {
+                    if (s._endingPlayed) return '[SIGNAL LOST]\n[SIGNAL LOST]\n[SIGNAL LOST]';
+                    if (s.collected.has('facility_log'))
+                        return 'PINEBROOK NUCLEAR RESERVE\nFACILITY LOG — SECTOR 7\n\nCoolant loop: OFFLINE (14d 11h)\nCore temp: CRITICAL\nContainment: PARTIAL\n\nDr. Chen\'s log confirms everything.\nThis needs to get out.\n\n[ You have all the evidence. ]';
+                    return 'PINEBROOK NUCLEAR RESERVE\nFACILITY LOG — SECTOR 7\n\nBreach: coolant line fracture\nDay 14 — Status: UNRESOLVED\n\nThis terminal is live. Something is very wrong.\nYou need the full picture before you act.';
+                },
+                onInteract: (s) => {
+                    if (!s._endingPlayed && s.collected.has('facility_log')) s._triggerEnding();
+                }
             }
         ];
 

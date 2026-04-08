@@ -217,6 +217,23 @@ class CaveScene extends Phaser.Scene {
         g.lineStyle(1, 0x334433);
         g.lineBetween(330, 50, 340, 45); g.lineBetween(340, 60, 352, 55); // knobs
 
+        // SECTOR 7 sealed door — embedded in the ceiling wall at y≈150
+        g.fillStyle(0x1c2828); g.fillRect(350, 130, 104, 32);   // door frame
+        g.fillStyle(0x141e1e); g.fillRect(354, 133, 96, 26);    // door face
+        g.lineStyle(1, 0x2a3838); g.strokeRect(354, 133, 96, 26);
+        g.fillStyle(0x243030); g.fillRect(397, 140, 10, 12);    // handle recess
+        g.fillStyle(0x0a1414); g.fillRect(399, 141, 6, 10);     // keypad dead
+        g.fillStyle(0x550000, 0.7); g.fillCircle(402, 146, 2);  // dead red light
+        this.add.text(400, 136, 'SECTOR 7', {
+            fontSize: '5px', fill: '#2a4444', fontFamily: 'monospace'
+        }).setDepth(5).setOrigin(0.5, 0);
+
+        // Ventilation shaft grate (to the left of the door, at ceiling wall)
+        g.fillStyle(0x1a2424); g.fillRect(318, 134, 22, 24);    // shaft frame
+        g.lineStyle(1, 0x2a3434, 0.8);
+        for (let ly = 136; ly < 156; ly += 5) g.lineBetween(320, ly, 338, ly); // grate bars
+        g.lineBetween(329, 134, 329, 158); // vertical bar
+
         // Entry shaft visual (dark shaft going down)
         g.fillStyle(0x0a0806); g.fillRect(348, 480, 104, 80);
         g.lineStyle(1, 0x3a2a1a, 0.4);
@@ -332,9 +349,18 @@ class CaveScene extends Phaser.Scene {
                 speaker: '',
                 text: () => {
                     const col = (window.gameState && window.gameState.collected) || [];
-                    return col.includes('frank_lore_3')
-                        ? 'The sealed door. You have Frank\'s survey map.\nThe lower chamber is behind this.\nBut it\'s bolted from inside — you need another way in.'
-                        : 'A heavy steel door set into the rock.\n"SECTOR 7 — AUTHORIZED PERSONNEL ONLY"\n\nBolted from inside. No power to the keypad.\nSomething important enough to seal permanently.\n\nNot yet. Come back when you know more.';
+                    if (col.includes('facility_log'))
+                        return 'You\'ve already been inside.\n\nDr. Chen\'s log is saved.\nSomeone needs to see this.';
+                    if (col.includes('frank_lore_3'))
+                        return 'The door is sealed — but beside it, almost hidden by years of mineral growth, a ventilation shaft cover.\nLoose. Corroded.\n\nYou pull it free.\n\n[ You squeeze through into the darkness. ]';
+                    return 'A heavy steel door set into the rock.\n"SECTOR 7 — AUTHORIZED PERSONNEL ONLY"\n\nBolted from inside. No power to the keypad.\nSomething important enough to seal permanently.\n\nNot yet. Come back when you know more.';
+                },
+                after: (s) => {
+                    const col = (window.gameState && window.gameState.collected) || [];
+                    if (col.includes('frank_lore_3') && !col.includes('facility_log')) {
+                        s.cameras.main.fade(900, 0, 0, 0);
+                        s.time.delayedCall(1000, () => s.scene.start('Sector7Scene'));
+                    }
                 }
             },
             {
