@@ -14,6 +14,9 @@ class GameScene extends Phaser.Scene {
         this._actionWasPressed = false;
         this._autoQuestZones   = [];
         this._footstepTimer    = 0;
+        this._walkFrame        = 0;
+        this._walkTimer        = 0;
+        this._endingPlayed     = false;
 
         this.physics.world.setBounds(0, 0, W, H);
 
@@ -82,6 +85,26 @@ class GameScene extends Phaser.Scene {
         if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
         this.player.setVelocity(vx, vy);
 
+        // Walk animation
+        if (vx !== 0 || vy !== 0) {
+            this._walkTimer -= 16;
+            if (this._walkTimer <= 0) {
+                this._walkTimer = 180;
+                this._walkFrame = this._walkFrame === 0 ? 1 : 0;
+            }
+            // Facing up with no horizontal: show back-of-head frame
+            const tex = (vy < 0 && vx === 0)
+                ? 'player_back'
+                : (this._walkFrame === 0 ? 'player_walkA' : 'player_walkB');
+            this.player.setTexture(tex);
+            if (vx < 0) this.player.setFlipX(true);
+            else if (vx > 0) this.player.setFlipX(false);
+        } else {
+            this.player.setTexture('player_idle');
+            this._walkFrame = 0;
+            this._walkTimer = 0;
+        }
+
         // Footstep sound
         if (vx !== 0 || vy !== 0) {
             this._footstepTimer -= 16;
@@ -101,6 +124,7 @@ class GameScene extends Phaser.Scene {
 
         this._handleActionPress(() => { if (nearest) this._triggerInteraction(nearest); });
         this._checkAutoZones();
+        this._checkEndingInput();
     }
 
     _handleActionPress(cb) {
@@ -245,10 +269,12 @@ class GameScene extends Phaser.Scene {
                 text: 'PINEBROOK NUCLEAR RESERVE\nEMPLOYEE: MARCUS COLE\nID: NR-4471  CLEARANCE: LEVEL 2\n\n[EXPIRED]'
             },
             {
-                id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Read',
+                id: 'control_panel', x: 1200, y: 580, range: 70, hintLabel: 'Access terminal',
                 speaker: 'TERMINAL',
-                getText: () => 'FACILITY LOG — SECTOR 7\nBreach detected: Day 14 — Status: UNRESOLVED\nPersonnel: 23 evacuated / 21 accounted for\n[Further records corrupted]',
-                onInteract: null
+                getText: (s) => s._endingPlayed
+                    ? '[SIGNAL LOST]\n[SIGNAL LOST]\n[SIGNAL LOST]'
+                    : 'PINEBROOK NUCLEAR RESERVE\nFACILITY LOG — SECTOR 7\n\nBreach: coolant line fracture\nDay 14 — Status: UNRESOLVED\n[Press again to continue...]',
+                onInteract: (s) => { if (!s._endingPlayed) s._triggerEnding(); }
             }
         ];
 
@@ -322,68 +348,73 @@ class GameScene extends Phaser.Scene {
         g.fillRect(0, 0, w, 20);
     }
 
-    _createPlayer() {
-        // 18×30 detailed sprite matching reference art style
+    // Draw one player animation frame into a named texture.
+    // legLX/legRX: x offset of left/right leg (controls stride spread).
+    // showFace: false for the back-facing (walking up) frame.
+    _makePlayerFrame(key, legLX, legRX, showFace) {
         const rt = this.add.renderTexture(0, 0, 18, 30);
         const g  = this.make.graphics({ x: 0, y: 0, add: false });
 
         // Shoes
         g.fillStyle(0x2a1a0a);
-        g.fillRect(1, 27, 7, 3); g.fillRect(10, 27, 7, 3);
+        g.fillRect(legLX, 27, 6, 3); g.fillRect(legRX, 27, 6, 3);
 
         // Legs — jeans blue
         g.fillStyle(0x2244aa);
-        g.fillRect(2, 20, 6, 8); g.fillRect(10, 20, 6, 8);
-
-        // Jeans highlight
+        g.fillRect(legLX, 20, 5, 8); g.fillRect(legRX, 20, 5, 8);
         g.fillStyle(0x3355cc, 0.5);
-        g.fillRect(3, 21, 2, 6); g.fillRect(11, 21, 2, 6);
+        g.fillRect(legLX + 1, 21, 2, 6); g.fillRect(legRX + 1, 21, 2, 6);
 
         // Body — red jacket
-        g.fillStyle(0xbb2222);
-        g.fillRect(2, 10, 14, 11);
+        g.fillStyle(0xbb2222); g.fillRect(2, 10, 14, 11);
+        g.fillStyle(0xdd3333); g.fillRect(3, 10, 5, 4);
 
-        // Jacket highlight / lapel
-        g.fillStyle(0xdd3333);
-        g.fillRect(3, 10, 5, 4);
-
-        // Backpack (brown, on right shoulder)
-        g.fillStyle(0x8b5e20);
-        g.fillRect(13, 11, 5, 10);
-        g.fillStyle(0x7a5010);
-        g.fillRect(14, 12, 3, 8);
+        // Backpack
+        g.fillStyle(0x8b5e20); g.fillRect(13, 11, 5, 10);
+        g.fillStyle(0x7a5010); g.fillRect(14, 12, 3, 8);
 
         // Arms
         g.fillStyle(0xbb2222);
         g.fillRect(0, 11, 3, 7); g.fillRect(15, 11, 3, 7);
 
-        // Neck skin
-        g.fillStyle(0xe8c090);
-        g.fillRect(7, 7, 4, 4);
+        // Neck
+        g.fillStyle(0xe8c090); g.fillRect(7, 7, 4, 4);
 
-        // Head — skin
-        g.fillStyle(0xe8c090);
-        g.fillRect(3, 1, 12, 9);
+        // Head
+        g.fillStyle(0xe8c090); g.fillRect(3, 1, 12, 9);
 
-        // Hair — warm brown like reference
+        // Hair
         g.fillStyle(0x6b3318);
         g.fillRect(3, 0, 12, 4);
-        g.fillRect(3, 4, 2, 3);
-        g.fillRect(13, 4, 2, 3);
+        g.fillRect(3, 4, 2, 3); g.fillRect(13, 4, 2, 3);
 
-        // Eyes
-        g.fillStyle(0x1a1a1a);
-        g.fillRect(5, 5, 2, 2); g.fillRect(11, 5, 2, 2);
-
-        // Mouth
-        g.fillStyle(0xb06040);
-        g.fillRect(7, 8, 4, 1);
+        if (showFace) {
+            // Eyes
+            g.fillStyle(0x1a1a1a);
+            g.fillRect(5, 5, 2, 2); g.fillRect(11, 5, 2, 2);
+            // Mouth
+            g.fillStyle(0xb06040); g.fillRect(7, 8, 4, 1);
+        } else {
+            // Back of head — just hair, no face
+            g.fillStyle(0x6b3318); g.fillRect(3, 1, 12, 8);
+        }
 
         rt.draw(g, 0, 0);
-        rt.saveTexture('player_tex');
+        rt.saveTexture(key);
         g.destroy(); rt.destroy();
+    }
 
-        this.player = this.physics.add.sprite(280, 580, 'player_tex');
+    _createPlayer() {
+        // idle: legs level
+        this._makePlayerFrame('player_idle',  2, 10, true);
+        // walkA: left leg forward (wider left), right leg back (closer center)
+        this._makePlayerFrame('player_walkA', 0, 11, true);
+        // walkB: right leg forward (wider right), left leg back (closer center)
+        this._makePlayerFrame('player_walkB', 3,  9, true);
+        // back: facing up — hair covers face
+        this._makePlayerFrame('player_back',  2, 10, false);
+
+        this.player = this.physics.add.sprite(280, 580, 'player_idle');
         this.player.setCollideWorldBounds(true);
         this.player.setDepth(10);
     }
@@ -856,5 +887,114 @@ class GameScene extends Phaser.Scene {
         // Physics body
         const b = this.obstacles.create(tx, ty + 10, 'pixel');
         b.setVisible(false); b.setDisplaySize(70, 30); b.body.setSize(70, 30); b.refreshBody();
+    }
+
+    // ----------------------------------------------------------
+    // ENDING SEQUENCE
+    // ----------------------------------------------------------
+
+    _triggerEnding() {
+        this._endingPlayed = true;
+
+        const seq = [
+            ['TERMINAL', 'PINEBROOK NUCLEAR RESERVE\nFACILITY LOG — SECTOR 7\n\nCoolant line fracture — Reactor 7\nLeak duration: 14+ days\nContainment status: FAILED'],
+            ['TERMINAL', 'Personnel log:\n  23 evacuated  /  21 accounted for\n\n  MARCUS COLE  [NR-4471] — UNKNOWN\n  R. DARNELL   [NR-3382] — EVACUATED'],
+            ['TERMINAL', '[WARNING] Radiation level: CRITICAL\n[WARNING] Do not enter Sector 7\n\nAll remaining personnel:\nEVACUATE IMMEDIATELY'],
+            ['NOTE', '"Marcus — if you\'re reading this,\nI couldn\'t wait any longer.\nI left the truck at site 4.\nPlease just go home.  — R.D."'],
+            ['', 'The terminal flickers. Somewhere behind you,\nthe fire is still burning at Marcus\'s camp.\n\nNobody has come back for it.'],
+        ];
+
+        let i = 0;
+        const showNext = () => {
+            if (i >= seq.length) { this._showEnding(); return; }
+            const [spk, txt] = seq[i++];
+            this.dialogue.show(spk, txt, showNext);
+        };
+        showNext();
+    }
+
+    _showEnding() {
+        // Stop player movement
+        this.player.setVelocity(0, 0);
+
+        // Fade to black over 2.5 seconds
+        this.cameras.main.fade(2500, 0, 0, 0);
+
+        this.time.delayedCall(2700, () => {
+            // Black overlay to keep screen dark
+            const overlay = this.add.graphics().setScrollFactor(0).setDepth(500);
+            overlay.fillStyle(0x000000, 1);
+            overlay.fillRect(0, 0, 480, 320);
+
+            const cx = 240, style = (sz, col) => ({
+                fontSize: sz + 'px', fill: col, fontFamily: 'monospace',
+                align: 'center'
+            });
+
+            // Facility header (green, monospace terminal feel)
+            this.add.text(cx, 60, 'PINEBROOK NUCLEAR RESERVE', style(9, '#00cc44'))
+                .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+            this.add.text(cx, 76, 'SECTOR 7  —  COOLANT BREACH', style(8, '#008833'))
+                .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+
+            // Status line
+            this.add.text(cx, 108, 'STATUS: UNRESOLVED', style(10, '#ff4444'))
+                .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+
+            // Story beat
+            const storyLines = [
+                'Marcus Cole was never found.',
+                'R. Darnell reported the breach three days later.',
+                'The campfire burned out on its own.',
+            ];
+            storyLines.forEach((line, i) => {
+                this.add.text(cx, 148 + i * 18, line, style(8, '#aaaaaa'))
+                    .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+            });
+
+            // Title card
+            this.add.text(cx, 240, 'CAMPING PARK MYSTERY', style(13, '#ffffff'))
+                .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+            this.add.text(cx, 260, 'THE END', style(9, '#888888'))
+                .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+
+            // Restart prompt
+            const restartPrompt = this.add.text(cx, 294, '[ A ] Play again', style(8, '#555555'))
+                .setScrollFactor(0).setDepth(501).setOrigin(0.5).setAlpha(0);
+
+            // Fade all text in sequentially
+            const allTexts = this.children.list
+                .filter(o => o.depth === 501 && o.alpha === 0);
+            allTexts.forEach((t, i) => {
+                this.tweens.add({
+                    targets: t, alpha: 1,
+                    delay: 400 + i * 300, duration: 600, ease: 'Sine.easeIn'
+                });
+            });
+
+            // Blink restart prompt after 3s
+            this.time.delayedCall(3200, () => {
+                this.tweens.add({
+                    targets: restartPrompt, alpha: { from: 1, to: 0.2 },
+                    yoyo: true, repeat: -1, duration: 700
+                });
+                // Listen for restart
+                this._actionWasPressed = false;
+                this._endingListening = true;
+            });
+        });
+    }
+
+    // Override update to handle ending restart
+    _checkEndingInput() {
+        if (!this._endingListening) return;
+        const down = (this.eKey && this.eKey.isDown) || window.virtualKeys.action;
+        if (down && !this._actionWasPressed) {
+            this._actionWasPressed = true;
+            this._endingListening  = false;
+            this.cameras.main.fadeIn(800, 0, 0, 0);
+            this.time.delayedCall(900, () => this.scene.start('TitleScene'));
+        }
+        if (!down) this._actionWasPressed = false;
     }
 }
