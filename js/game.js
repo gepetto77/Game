@@ -27,7 +27,7 @@ const config = {
             debug: false        // set to true to see collision boxes
         }
     },
-    scene: [TitleScene, ColdOpenScene, GameScene, CaveScene, Sector7Scene]
+    scene: [TitleScene, ColdOpenScene, GameScene, LakeScene, WildernessScene, FacilityScene, CaveScene, Sector7Scene]
 };
 
 const game = new Phaser.Game(config);

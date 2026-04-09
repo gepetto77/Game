@@ -14,11 +14,11 @@ const QUEST_STATES = {
 
 // ---- One label per state ------------------------------------
 const QUEST_LABELS = [
-    'Explore the campground',
-    'Investigate the glow near the fence',
-    'Gate is locked. Check the shed south of camp for tools',
-    'Use the bolt cutters on the fence gate',
-    'Find the source of the signal'
+    'Explore Pinebrook Campground',
+    'Investigate the restricted facility east of camp',
+    'The gate is padlocked — find bolt cutters',
+    'Use the bolt cutters on the facility gate',
+    'Explore the facility grounds'
 ];
 
 class QuestTracker {

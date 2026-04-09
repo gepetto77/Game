@@ -392,6 +392,8 @@ class CaveScene extends Phaser.Scene {
         if (this._returning) return;
         this._returning = true;
         this.cameras.main.fade(1000, 0, 0, 0);
-        this.time.delayedCall(1100, () => this.scene.start('GameScene'));
+        // Return to Wilderness — cave entrance is at (634, 898) in WildernessScene
+        if (window.gameState) { window.gameState.entryX = 634; window.gameState.entryY = 860; }
+        this.time.delayedCall(1100, () => this.scene.start('WildernessScene'));
     }
 }
