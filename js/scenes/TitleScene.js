@@ -70,8 +70,13 @@ class TitleScene extends Phaser.Scene {
             fontFamily: 'monospace', letterSpacing: 2
         }).setOrigin(0.5);
 
-        // --- "Press A to start" prompt (blinking) ---
-        const prompt = this.add.text(W / 2, 268, 'PRESS  [ A ]  TO  START', {
+        // --- Prompt (changes based on whether a save exists) ---
+        this._hasSave = window.SaveManager && window.SaveManager.hasSave();
+
+        const promptStr = this._hasSave
+            ? '[ A ] CONTINUE    [ N ] NEW GAME'
+            : 'PRESS  [ A ]  TO  START';
+        const prompt = this.add.text(W / 2, 262, promptStr, {
             fontSize: '11px', fill: '#ffd700', fontFamily: 'monospace'
         }).setOrigin(0.5);
 
@@ -81,8 +86,18 @@ class TitleScene extends Phaser.Scene {
             yoyo: true, repeat: -1, duration: 650, ease: 'Sine.easeInOut'
         });
 
+        // Sub-hint when save exists
+        if (this._hasSave) {
+            const save = window.SaveManager.load();
+            const qs   = save && save.questState != null ? save.questState : 0;
+            const label = (typeof QUEST_LABELS !== 'undefined' && QUEST_LABELS[qs]) || '';
+            this.add.text(W / 2, 284, `Stage ${qs + 1}/8  \u2014  ${label}`, {
+                fontSize: '7px', fill: '#556655', fontFamily: 'monospace'
+            }).setOrigin(0.5);
+        }
+
         // Small version label bottom-right
-        this.add.text(W - 8, H - 10, 'v0.2', {
+        this.add.text(W - 8, H - 10, 'v0.3', {
             fontSize: '8px', fill: '#333344', fontFamily: 'monospace'
         }).setOrigin(1, 1);
 
@@ -91,30 +106,48 @@ class TitleScene extends Phaser.Scene {
         this._ready = false;
         this.time.delayedCall(1100, () => { this._ready = true; });
 
-        // Keyboard: any key starts
-        this.input.keyboard.on('keydown', () => this._start());
+        // Keyboard
+        this.input.keyboard.on('keydown', (event) => {
+            if (!this._ready) return;
+            if (this._hasSave && (event.key === 'n' || event.key === 'N')) {
+                this._newGame();
+            } else {
+                this._continue();
+            }
+        });
     }
 
     update() {
-        // Virtual A button (on-screen D-pad) also starts the game
-        if (this._ready && window.virtualKeys && window.virtualKeys.action) {
+        if (!this._ready) return;
+        if (window.virtualKeys && window.virtualKeys.action) {
             window.virtualKeys.action = false;
-            this._start();
+            this._continue();
         }
     }
 
-    _start() {
+    _continue() {
         if (!this._ready) return;
-        this._ready = false; // prevent double-fire
+        this._ready = false;
+        if (window.soundManager) window.soundManager.init();
 
-        // Initialise Web Audio here — browsers require a user gesture first
-        if (window.soundManager) {
-            window.soundManager.init();
+        if (this._hasSave) {
+            const save = window.SaveManager.load();
+            if (save) window.gameState = save;
         }
 
         this.cameras.main.fadeOut(700, 0, 0, 0);
-        this.time.delayedCall(750, () => {
-            this.scene.start('ColdOpenScene');
-        });
+        // Skip ColdOpenScene when continuing; go straight to GameScene
+        const dest = this._hasSave ? 'GameScene' : 'ColdOpenScene';
+        this.time.delayedCall(750, () => this.scene.start(dest));
+    }
+
+    _newGame() {
+        if (!this._ready) return;
+        this._ready = false;
+        if (window.soundManager) window.soundManager.init();
+        if (window.SaveManager) window.SaveManager.clear();
+        window.gameState = null;
+        this.cameras.main.fadeOut(700, 0, 0, 0);
+        this.time.delayedCall(750, () => this.scene.start('ColdOpenScene'));
     }
 }

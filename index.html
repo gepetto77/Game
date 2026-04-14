@@ -385,15 +385,19 @@
   <!-- 1. Phaser from CDN (no npm needed) -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 
-  <!-- 2. Audio (no dependencies — creates window.soundManager) -->
+  <!-- 2. Save system (no dependencies — creates window.SaveManager) -->
+  <script src="js/save/SaveManager.js"></script>
+
+  <!-- 3. Audio (no dependencies — creates window.soundManager) -->
   <script src="js/audio/SoundManager.js"></script>
 
-  <!-- 3. UI classes (no dependencies) -->
+  <!-- 4. UI classes (no dependencies) -->
   <script src="js/ui/DialogueBox.js"></script>
   <script src="js/ui/QuestTracker.js"></script>
   <script src="js/ui/HeartsHUD.js"></script>
+  <script src="js/ui/InventoryPanel.js"></script>
 
-  <!-- 3b. Creature helper (global functions, no Phaser dependency) -->
+  <!-- 4b. Creature helper (global functions, no Phaser dependency) -->
   <script src="js/scenes/Creature.js"></script>
 
   <!-- 4. Scenes (depend on UI classes) -->

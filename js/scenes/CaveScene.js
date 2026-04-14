@@ -51,6 +51,7 @@ class CaveScene extends Phaser.Scene {
         this._heartsHUD = new HeartsHUD(this, this._maxHp);
         this._heartsHUD._hp = this._hp; this._heartsHUD._draw();
         this._attackGfx = this.add.graphics().setDepth(11);
+        this._invPanel  = new InventoryPanel(this); this._invWasPressed = false;
 
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ccffcc', fontFamily: 'monospace',
@@ -71,6 +72,7 @@ class CaveScene extends Phaser.Scene {
         this.eKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.xKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.iKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
 
         // ---- Radiation zone + enemies ----
         this._radZones = [];
@@ -90,6 +92,10 @@ class CaveScene extends Phaser.Scene {
     // ----------------------------------------------------------
     update(time, delta) {
         const dt = delta || 16;
+        const iDown = this.iKey && this.iKey.isDown;
+        if (iDown && !this._invWasPressed) { this._invWasPressed = true; this._invPanel.toggle(); }
+        if (!iDown) this._invWasPressed = false;
+        if (this._invPanel.isOpen()) { this.player.setVelocity(0, 0); return; }
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0, 0);
             const down = this.eKey.isDown || window.virtualKeys.action;
@@ -538,6 +544,7 @@ class CaveScene extends Phaser.Scene {
         if(!window.gameState)window.gameState={};
         window.gameState.hp    = this._hp;
         window.gameState.maxHp = this._maxHp;
+        SaveManager.save(window.gameState);
     }
 
     _returnSurface() {
