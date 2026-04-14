@@ -59,6 +59,7 @@ class GameScene extends Phaser.Scene {
         this._createPlayer();
         this.cameras.main.setBounds(0, 0, W, H);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(2);
         this.cameras.main.fadeIn(800, 0, 0, 0);
         this.physics.add.collider(this.player, this.obstacles);
 
@@ -483,6 +484,18 @@ class GameScene extends Phaser.Scene {
         // Lake path indicator (NE corner open area, lighter grass)
         g.fillStyle(0x5a8a40); g.fillRect(950, 0, 250, 300);
         g.fillStyle(0x6a9a50); g.fillRect(990, 0, 210, 180);
+
+        // Scattered rocks near treeline
+        [[150,260],[325,278],[605,268],[845,258],[985,298],[122,448],[752,418],[880,650],[340,780],[580,800]].forEach(([rx,ry])=>{
+            const rg = this.add.graphics().setDepth(2);
+            drawRock(rg, rx, ry, 5 + Math.floor(Math.random()*4));
+        });
+        // Grass tufts along path edges
+        [[82,294],[162,294],[262,291],[402,291],[562,291],[722,291],[882,289],
+         [92,349],[202,351],[352,349],[502,347],[682,349],[820,349]].forEach(([gx,gy])=>{
+            const gg = this.add.graphics().setDepth(2);
+            drawGrassTuft(gg, gx, gy);
+        });
     }
 
     _createCabin() {
@@ -638,23 +651,60 @@ class GameScene extends Phaser.Scene {
     _createCampsiteMaple() {
         const cx = 228, cy = 458;
         const g = this.add.graphics().setDepth(3);
-        // Clearing
-        g.fillStyle(0x4a7a35, 0.6); g.fillEllipse(cx, cy+10, 200, 110);
+        // Irregular clearing — two overlapping ellipses
+        g.fillStyle(0x4a7a35, 0.55); g.fillEllipse(cx,    cy+10, 200, 110);
+        g.fillStyle(0x52883c, 0.35); g.fillEllipse(cx+20, cy-10, 160, 90);
+        // Grass tufts inside clearing
+        [[cx-60,cy+20],[cx+30,cy+30],[cx-20,cy-20],[cx+50,cy-10],[cx-50,cy-10],[cx+10,cy+40]].forEach(([gx,gy])=>{
+            drawGrassTuft(g, gx, gy, 0x4a8a28);
+        });
+        // Fire pit + surrounding rocks
         this._drawFire(g, cx+14, cy-28);
+        [[-18,0],[18,0],[0,-16],[14,-10],[-14,-10]].forEach(([dx,dy])=>{
+            drawRock(g, cx+14+dx, cy-28+dy, 4);
+        });
+        // Log seats around fire
+        drawLogSeat(g, cx-8,  cy-44);
+        drawLogSeat(g, cx+36, cy-20);
+        drawLogSeat(g, cx+4,  cy-12);
+        // Tent + backpack nearby
         this._drawTent(g, cx-42, cy+18, 0x3a5a8a, 0x6a8ab0);
+        drawBackpack(g, cx-18, cy+28);
+        // Table + lantern post
         this._drawTable(g, cx+60, cy+20);
+        drawLantern(g, cx+85, cy-10);
         this._drawSiteSign(g, cx-80, cy-30, 'A');
     }
 
     _createCampsitePine() {
         const cx = 532, cy = 438;
         const g = this.add.graphics().setDepth(3);
-        g.fillStyle(0x4a7a35, 0.55); g.fillEllipse(cx, cy+8, 210, 110);
+        // Irregular clearing — three overlapping ellipses
+        g.fillStyle(0x4a7a35, 0.5);  g.fillEllipse(cx,    cy+8,  210, 110);
+        g.fillStyle(0x52883c, 0.3);  g.fillEllipse(cx-20, cy-15, 170, 90);
+        g.fillStyle(0x3e6c2a, 0.3);  g.fillEllipse(cx+30, cy+20, 140, 80);
+        // Grass tufts
+        [[cx-70,cy+20],[cx+40,cy+30],[cx-30,cy-15],[cx+60,cy-5],[cx-55,cy+5],[cx+20,cy+40],[cx-10,cy-25],[cx+50,cy+20]].forEach(([gx,gy])=>{
+            drawGrassTuft(g, gx, gy, 0x4a8a28);
+        });
+        // Fire pit + rocks
         this._drawFire(g, cx-12, cy-22);
+        [[-18,0],[18,0],[0,-16],[14,-10],[-14,-10]].forEach(([dx,dy])=>{
+            drawRock(g, cx-12+dx, cy-22+dy, 4);
+        });
+        // Log seats
+        drawLogSeat(g, cx-32, cy-38);
+        drawLogSeat(g, cx+10, cy-40);
+        drawLogSeat(g, cx+14, cy-8);
+        drawLogSeat(g, cx-30, cy-8);
+        // Two tents
         this._drawTent(g, cx+50, cy+14, 0xc86428, 0xe88048);
-        this._drawTent(g, cx+80, cy+20, 0xa85020, 0xc87040);
+        this._drawTent(g, cx+82, cy+22, 0xa85020, 0xc87040);
+        // Cooler near larger tent
+        drawCooler(g, cx+34, cy+26);
+        // Table
         this._drawTable(g, cx-55, cy+22);
-        this._drawSiteSign(g, cx+90, cy-28, 'B');
+        this._drawSiteSign(g, cx+100, cy-28, 'B');
     }
 
     _drawFire(g, fx, fy) {

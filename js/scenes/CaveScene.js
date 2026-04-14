@@ -45,6 +45,7 @@ class CaveScene extends Phaser.Scene {
         // ---- Camera ----
         this.cameras.main.setBounds(0, 0, W, H);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(2);
         this.cameras.main.fadeIn(1200, 0, 0, 0);
 
         // ---- UI ----

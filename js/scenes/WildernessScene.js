@@ -48,6 +48,7 @@ class WildernessScene extends Phaser.Scene {
         this._createPlayer();
         this.cameras.main.setBounds(0,0,W,H);
         this.cameras.main.startFollow(this.player,true,0.1,0.1);
+        this.cameras.main.setZoom(2);
         this.cameras.main.fadeIn(700,0,0,0);
         this.physics.add.collider(this.player,this.obstacles);
 
@@ -341,75 +342,137 @@ class WildernessScene extends Phaser.Scene {
         g.fillStyle(0x1a5a8a,0.5); g.fillRect(180,762,880,8);
         // Creek banks
         g.fillStyle(0xa8a060,0.4); g.fillRect(180,756,880,8); g.fillRect(180,780,880,8);
+
+        // Scattered rocks near forest edges and creek bank
+        [[122,198],[164,378],[202,558],[902,218],[1002,398],[1102,578],
+         [282,754],[402,757],[602,752],[802,755],[952,757],[480,340],[740,280]].forEach(([rx,ry])=>{
+            const rg=this.add.graphics().setDepth(2);
+            drawRock(rg, rx, ry, 5+Math.floor(Math.random()*5));
+        });
+        // Grass tufts along path edges
+        [[122,54],[302,54],[502,54],[702,54],[902,54],[1102,54],
+         [122,581],[302,581],[502,581],[700,320],[450,480],[880,450]].forEach(([gx,gy])=>{
+            const gg=this.add.graphics().setDepth(2);
+            drawGrassTuft(gg, gx, gy, 0x3a8020);
+        });
     }
 
     _createCampsiteBirch(){       // C - Harold (retired ranger)
         const cx=280,cy=140;
         const g=this.add.graphics().setDepth(3);
-        g.fillStyle(0x3a6a1e,0.55); g.fillEllipse(cx,cy+8,200,110);
+        // Irregular clearing
+        g.fillStyle(0x3a6a1e,0.5);  g.fillEllipse(cx,    cy+8,  200,110);
+        g.fillStyle(0x427530,0.3);  g.fillEllipse(cx+15, cy-10, 160, 80);
+        // Grass tufts
+        [[cx-60,cy+20],[cx+30,cy+25],[cx-20,cy-18],[cx+40,cy-8],[cx-45,cy+5]].forEach(([gx,gy])=>drawGrassTuft(g,gx,gy,0x3a7820));
+        // Fire + rocks
         this._drawFire(g,cx+18,cy-24);
+        [[-18,0],[18,0],[0,-15],[14,-8],[-14,-8]].forEach(([dx,dy])=>drawRock(g,cx+18+dx,cy-24+dy,4));
+        // Log seats
+        drawLogSeat(g,cx+2, cy-42);
+        drawLogSeat(g,cx+36,cy-14);
+        // Ranger gear: tent + backpack + survey table
         this._drawTent(g,cx-38,cy+16,0x3a6a28,0x5a8a40);
+        drawBackpack(g,cx-14,cy+26);
+        this._drawTable(g,cx+20,cy-32);
+        this.add.text(cx+20,cy-42,'SURVEY',{fontSize:'4px',fill:'#d4c080',fontFamily:'monospace'}).setDepth(5).setOrigin(0.5);
         this._drawTable(g,cx+55,cy+18);
         this._drawSiteSign(g,cx-78,cy-28,'C');
-        // Harold NPC — retired ranger, khaki shirt, grey-brown hair, tan pants
+        // Harold NPC
         const np=this.add.graphics().setDepth(8);
         const hx=cx+60,hy=cy+30;
         drawNPC(np, hx, hy, 0x8a6a3a, 0xb0906a, 0x5a4a30);
-        // Ranger hat
         np.fillStyle(0x4a3a20); np.fillRect(hx-9,hy-22,18,4); np.fillRect(hx-6,hy-28,12,8);
     }
 
-    _createCampsiteCedar(){      // D - Cedar (Mia's site, she's at the lake)
+    _createCampsiteCedar(){      // D - Cedar / Mia (abandoned — she went to the lake)
         const cx=660,cy=130;
         const g=this.add.graphics().setDepth(3);
         g.fillStyle(0x3a6a1e,0.5); g.fillEllipse(cx,cy+8,200,110);
-        this._drawFire(g,cx-14,cy-20);
+        g.fillStyle(0x427530,0.28); g.fillEllipse(cx-10,cy-8,160,80);
+        [[cx-55,cy+18],[cx+35,cy+22],[cx-18,cy-16],[cx+42,cy-6]].forEach(([gx,gy])=>drawGrassTuft(g,gx,gy,0x3a7820));
+        // Cold fire ring — no flames, just dark pit + rocks
+        g.fillStyle(0x1a1008); g.fillCircle(cx-14,cy-20,11);
+        [[-16,4],[16,4],[0,-14],[13,-7],[-13,-7]].forEach(([dx,dy])=>drawRock(g,cx-14+dx,cy-20+dy,4));
+        // Tent + abandoned gear
         this._drawTent(g,cx+42,cy+14,0x7a3a9a,0xa060c0);
+        drawBackpack(g,cx+20,cy+24);
+        drawCooler(g,cx-30,cy+26);
         this._drawTable(g,cx-52,cy+20);
         this._drawSiteSign(g,cx+82,cy-26,'D');
-        // Note pinned to tree nearby
+        // Note pinned to post
         const ng=this.add.graphics().setDepth(4);
         ng.fillStyle(0xf0e090); ng.fillRect(cx-90,cy-10,36,28);
         ng.lineStyle(1,0xc0a040); ng.strokeRect(cx-90,cy-10,36,28);
         this.add.text(cx-72,cy+4,'gone to\nthe lake',{fontSize:'5px',fill:'#4a3810',fontFamily:'monospace',align:'center'}).setDepth(5).setOrigin(0.5);
     }
 
-    _createCampsiteOak(){        // E - Group / Counselor Dana
+    _createCampsiteOak(){        // E - Group site / Counselor Dana
         const cx=930,cy=150;
         const g=this.add.graphics().setDepth(3);
-        g.fillStyle(0x3a6a1e,0.55); g.fillEllipse(cx,cy+8,240,120);
+        // Three overlapping ellipses for big irregular clearing
+        g.fillStyle(0x3a6a1e,0.5);  g.fillEllipse(cx,    cy+8,  240,120);
+        g.fillStyle(0x427530,0.28); g.fillEllipse(cx-20, cy-12, 190, 90);
+        g.fillStyle(0x3e6c2a,0.2);  g.fillEllipse(cx+25, cy+20, 160, 80);
+        // Tufts
+        [[cx-80,cy+25],[cx+50,cy+30],[cx-35,cy-18],[cx+65,cy-5],[cx-60,cy+5],[cx+25,cy+40],[cx-10,cy-25],[cx+55,cy+20],[cx-45,cy+35],[cx+10,cy-12]].forEach(([gx,gy])=>drawGrassTuft(g,gx,gy,0x3a7820));
+        // Fire + rocks
         this._drawFire(g,cx-8,cy-18);
-        // Shelter (lean-to)
+        [[-18,0],[18,0],[0,-15],[14,-8],[-14,-8]].forEach(([dx,dy])=>drawRock(g,cx-8+dx,cy-18+dy,4));
+        // Log seats (group site gets 4)
+        drawLogSeat(g,cx-28,cy-36);
+        drawLogSeat(g,cx+16,cy-36);
+        drawLogSeat(g,cx+18,cy-2);
+        drawLogSeat(g,cx-28,cy-2);
+        // Lean-to
         g.fillStyle(0x7a5a28); g.fillRect(cx-60,cy+10,80,16);
         g.fillStyle(0x6a4a20);
-        g.lineBetween&&(g.lineStyle(2,0x5a3a18));
         g.fillRect(cx-60,cy-14,6,28); g.fillRect(cx+14,cy-14,6,28);
         this._drawTent(g,cx+52,cy+8,0x8a4a20,0xb06030);
+        // Cooler + tables
+        drawCooler(g,cx+40,cy+26);
         this._drawTable(g,cx-30,cy+26);
         this._drawTable(g,cx+10,cy+26);
-        this._drawSiteSign(g,cx+88,cy-22,'E');
-        // Dana NPC — red shirt, dark hair, blue-grey pants
+        // Flagpole
+        g.fillStyle(0x5a3a18); g.fillRect(cx+78,cy-36,3,28);
+        g.fillStyle(0xcc3333); g.fillRect(cx+81,cy-36,12,8);
+        this._drawSiteSign(g,cx+98,cy-22,'E');
+        // Dana NPC
         const np=this.add.graphics().setDepth(8);
         const dx=cx-40,dy=cy+35;
         drawNPC(np, dx, dy, 0xc84838, 0x2a1808, 0x4a3a6a);
     }
 
-    _createCampsiteWillow(){     // F - Frank (wilderness guide)
+    _createCampsiteWillow(){     // F - Frank (bushcraft — no tent)
         const cx=280,cy=580;
         const g=this.add.graphics().setDepth(3);
         g.fillStyle(0x283818,0.6); g.fillEllipse(cx,cy+10,230,120);
+        g.fillStyle(0x304020,0.3); g.fillEllipse(cx+15,cy-8,180,90);
+        [[cx-65,cy+22],[cx+35,cy+28],[cx-25,cy-16],[cx+45,cy-6],[cx-45,cy+10]].forEach(([gx,gy])=>drawGrassTuft(g,gx,gy,0x3a7020));
+        // Fire with extra rocks (Frank is careful)
         this._drawFire(g,cx+8,cy-18);
-        // Lean-to / bushcraft shelter
+        [[-20,2],[20,2],[0,-17],[15,-9],[-15,-9],[0,8]].forEach(([dx,dy])=>drawRock(g,cx+8+dx,cy-18+dy,4));
+        // Log seats (3 close to fire)
+        drawLogSeat(g,cx-14,cy-36);
+        drawLogSeat(g,cx+30,cy-28);
+        drawLogSeat(g,cx-12,cy-6);
+        // Lean-to (Frank sleeps rough — no tent)
         g.fillStyle(0x4a3a18); g.fillRect(cx-70,cy-10,50,40);
         g.fillStyle(0x3a6a1a,0.7); g.fillRect(cx-72,cy-22,54,16);
         g.fillStyle(0x2a4a12,0.5); g.fillRect(cx-70,cy-18,50,10);
+        // Artifact display — flat stone with finds
+        g.fillStyle(0x5a5040); g.fillEllipse(cx+50,cy+10,40,20);  // flat stone
+        g.fillStyle(0x6a6050); g.fillEllipse(cx+50,cy+8,36,16);
+        drawRock(g,cx+40,cy+6,4); drawRock(g,cx+56,cy+8,3);
+        g.fillStyle(0xd4a840); g.fillCircle(cx+48,cy+5,3); g.fillCircle(cx+54,cy+4,2); // artifact glints
+        // Gear
+        drawBackpack(g,cx-52,cy+8);
         this._drawTable(g,cx+40,cy+22);
         this._drawSiteSign(g,cx-92,cy-22,'F');
-        // Frank NPC — dark earth-tone shirt, warm brown hair, dark pants; wide-brim hat
+        // Frank NPC + hat
         const np=this.add.graphics().setDepth(8);
         const fx=cx+10,fy=cy+30;
         drawNPC(np, fx, fy, 0x4a3a20, 0xb88840, 0x3a2a10);
-        // Wide-brim bush hat
         np.fillStyle(0x3a2a10); np.fillRect(fx-10,fy-22,20,4); np.fillRect(fx-6,fy-28,12,8);
         // Campfire embers glow
         const glow=this.add.graphics().setDepth(2);

@@ -153,3 +153,74 @@ function drawNPC(g, x, y, shirtCol, hairCol, pantsCol) {
     g.fillRect(x - 3, y - 14, 2, 1);
     g.fillRect(x + 1,  y - 14, 2, 1);
 }
+
+// ----------------------------------------------------------
+// Decorative rock — r is radius (5-10 works well)
+// ----------------------------------------------------------
+function drawRock(g, x, y, r) {
+    r = r || 6;
+    g.fillStyle(0x1a1810, 0.25); g.fillEllipse(x+2, y+r*0.5, r*2.2, r*0.7);
+    g.fillStyle(0x6a6050);       g.fillEllipse(x, y, r*2, r*1.3);
+    g.fillStyle(0x8a7a68);       g.fillEllipse(x-r*0.25, y-r*0.3, r*1.1, r*0.7);
+    g.fillStyle(0x4a3a30);       g.fillEllipse(x+r*0.3, y+r*0.15, r*0.6, r*0.35);
+}
+
+// ----------------------------------------------------------
+// Tiny grass tuft — 3 blades, col is highlight colour
+// ----------------------------------------------------------
+function drawGrassTuft(g, x, y, col) {
+    col = col !== undefined ? col : 0x4a8a28;
+    const dk = (col & 0xfefefe) >> 1; // rough darken
+    g.fillStyle(dk);
+    g.fillRect(x-3, y-5, 2, 6); g.fillRect(x+1, y-7, 2, 8); g.fillRect(x+4, y-4, 2, 5);
+    g.fillStyle(col);
+    g.fillRect(x-3, y-5, 1, 5); g.fillRect(x+1, y-7, 1, 7); g.fillRect(x+4, y-4, 1, 4);
+}
+
+// ----------------------------------------------------------
+// Log seat — short cut-log viewed from above/front
+// ----------------------------------------------------------
+function drawLogSeat(g, x, y) {
+    g.fillStyle(0x1a1008, 0.22); g.fillEllipse(x+2, y+5, 22, 7);
+    g.fillStyle(0x3a1a08);       g.fillRect(x-8, y, 16, 6);
+    g.fillStyle(0x2a1200);       g.fillEllipse(x, y, 18, 10);
+    g.fillStyle(0x6a3a18);       g.fillEllipse(x, y-1, 14, 7);
+    g.fillStyle(0x3a1a08);       g.fillEllipse(x, y-1, 9, 4.5);
+    g.fillStyle(0x5a2a10);       g.fillEllipse(x, y-1, 5, 2.5);
+}
+
+// ----------------------------------------------------------
+// Backpack leaning against something
+// ----------------------------------------------------------
+function drawBackpack(g, x, y) {
+    g.fillStyle(0x1a1008, 0.2);  g.fillEllipse(x+1, y+14, 18, 5);
+    g.fillStyle(0x1a0a00);       g.fillRect(x-6, y-12, 13, 26);
+    g.fillStyle(0x5a3a20);       g.fillRect(x-5, y-11, 11, 24);
+    g.fillStyle(0x3a2210);       g.fillRect(x-5, y-11, 11, 10);
+    g.fillStyle(0x7a5030, 0.7);  g.fillRect(x-5, y-1, 11, 2);
+    g.fillStyle(0xd4a840);       g.fillRect(x-1, y-4, 3, 3);
+}
+
+// ----------------------------------------------------------
+// Lantern on a short post
+// ----------------------------------------------------------
+function drawLantern(g, x, y) {
+    g.fillStyle(0x3a2810);       g.fillRect(x-1, y+2, 3, 18);
+    g.fillStyle(0x1a0a00);       g.fillRect(x-5, y-14, 11, 16);
+    g.fillStyle(0x3a3020);       g.fillRect(x-4, y-13, 9, 14);
+    g.fillStyle(0xffcc44, 0.85); g.fillRect(x-3, y-12, 7, 10);
+    g.fillStyle(0xffee88, 0.4);  g.fillEllipse(x, y-7, 16, 12);
+    g.fillStyle(0x3a3020);       g.fillRect(x-5, y-14, 11, 3);
+    g.fillStyle(0x3a3020);       g.fillRect(x-5, y-2,  11, 2);
+}
+
+// ----------------------------------------------------------
+// Cooler / storage box
+// ----------------------------------------------------------
+function drawCooler(g, x, y) {
+    g.fillStyle(0x1a1008, 0.22); g.fillEllipse(x+2, y+8, 26, 7);
+    g.fillStyle(0x1a0a00);       g.fillRect(x-10, y-6, 22, 14);
+    g.fillStyle(0x2a6a9a);       g.fillRect(x-9, y-5, 20, 12);
+    g.fillStyle(0x1a4a7a);       g.fillRect(x-9, y-5, 20, 4);
+    g.fillStyle(0xcccccc, 0.8);  g.fillRect(x-3, y-4, 6, 2);
+}

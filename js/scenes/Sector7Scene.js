@@ -37,6 +37,7 @@ class Sector7Scene extends Phaser.Scene {
 
         this.cameras.main.setBounds(0, 0, W, H);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(2);
         this.cameras.main.fadeIn(1400, 0, 0, 0);
 
         this.dialogue = new DialogueBox(this);

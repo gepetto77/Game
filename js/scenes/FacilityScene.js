@@ -46,6 +46,7 @@ class FacilityScene extends Phaser.Scene {
         this._createPlayer();
         this.cameras.main.setBounds(0,0,W,H);
         this.cameras.main.startFollow(this.player,true,0.1,0.1);
+        this.cameras.main.setZoom(2);
         this.cameras.main.fadeIn(700,0,0,0);
         this.physics.add.collider(this.player,this.obstacles);
 
