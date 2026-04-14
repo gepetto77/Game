@@ -22,6 +22,16 @@ class GameScene extends Phaser.Scene {
         this._endingPlayed     = false;
         this._artifactCounts   = { arrowheads: 0, pottery: 0, tools: 0 };
         this._transitioning    = false;
+        // Health
+        this._hp      = (window.gameState && window.gameState.hp    != null) ? window.gameState.hp    : 5;
+        this._maxHp   = (window.gameState && window.gameState.maxHp != null) ? window.gameState.maxHp : 5;
+        this._iframes = 0;
+        // Combat
+        this._attacking      = false;
+        this._attackTimer    = 0;
+        this._attackCooldown = 0;
+        this._attackDir      = { x: 0, y: 1 };
+        this._attackWasPressed = false;
 
         this.physics.world.setBounds(0, 0, W, H);
         const pg = this.make.graphics({ x:0, y:0, add:false });
@@ -51,8 +61,12 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.fadeIn(800, 0, 0, 0);
         this.physics.add.collider(this.player, this.obstacles);
 
-        this.dialogue = new DialogueBox(this);
-        this.quest    = new QuestTracker(this);
+        this.dialogue    = new DialogueBox(this);
+        this.quest       = new QuestTracker(this);
+        this._heartsHUD  = new HeartsHUD(this, this._maxHp);
+        this._heartsHUD._hp = this._hp;
+        this._heartsHUD._draw();
+        this._attackGfx  = this.add.graphics().setDepth(11);
 
         this._buildInteractables();
         this._createArtifacts();
@@ -66,7 +80,8 @@ class GameScene extends Phaser.Scene {
         if (window.gameState) this._loadFromGameState();
     }
 
-    update() {
+    update(time, delta) {
+        const dt = delta || 16;
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0, 0);
             this._handleActionPress(() => this.dialogue.tryDismiss());
@@ -84,8 +99,16 @@ class GameScene extends Phaser.Scene {
         if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
         this.player.setVelocity(vx, vy);
 
+        // Track last facing direction for attack hitbox
         if (vx !== 0 || vy !== 0) {
-            this._walkTimer -= 16;
+            this._attackDir = {
+                x: vx > 0 ? 1 : vx < 0 ? -1 : 0,
+                y: vy > 0 ? 1 : vy < 0 ? -1 : 0
+            };
+        }
+
+        if (vx !== 0 || vy !== 0) {
+            this._walkTimer -= dt;
             if (this._walkTimer <= 0) { this._walkTimer = 180; this._walkFrame = this._walkFrame === 0 ? 1 : 0; }
             const tex = (vy < 0 && vx === 0) ? 'player_back' : (this._walkFrame === 0 ? 'player_walkA' : 'player_walkB');
             this.player.setTexture(tex);
@@ -96,12 +119,32 @@ class GameScene extends Phaser.Scene {
         }
 
         if (vx !== 0 || vy !== 0) {
-            this._footstepTimer -= 16;
+            this._footstepTimer -= dt;
             if (this._footstepTimer <= 0) {
                 this._footstepTimer = 340;
                 if (window.soundManager && window.soundManager.ready) window.soundManager.playFootstep();
             }
         } else { this._footstepTimer = 0; }
+
+        // Attack input (B button / X key / Space)
+        const attackDown = (this.xKey && this.xKey.isDown) || (this.spaceKey && this.spaceKey.isDown) || window.virtualKeys.attack;
+        const col = Array.from(this.collected);
+        if (attackDown && !this._attackWasPressed && this._attackCooldown <= 0
+                && (col.includes('walking_stick') || col.includes('ember_stick'))) {
+            this._attackWasPressed = true;
+            this._startAttack();
+        }
+        if (!attackDown) this._attackWasPressed = false;
+        if (this._attackCooldown > 0) this._attackCooldown -= dt;
+        if (this._attacking) this._updateAttack(dt);
+
+        // Invincibility frames + player flash
+        if (this._iframes > 0) {
+            this._iframes -= dt;
+            this.player.setAlpha(Math.sin(this._iframes * 0.025) > 0 ? 1 : 0.3);
+        } else {
+            this.player.setAlpha(1);
+        }
 
         const nearest = this._nearestInteractable();
         if (nearest) {
@@ -193,12 +236,69 @@ class GameScene extends Phaser.Scene {
     }
 
     _setupInput() {
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.wasd    = this.input.keyboard.addKeys({
+        this.cursors  = this.input.keyboard.createCursorKeys();
+        this.wasd     = this.input.keyboard.addKeys({
             up: Phaser.Input.Keyboard.KeyCodes.W, down: Phaser.Input.Keyboard.KeyCodes.S,
             left: Phaser.Input.Keyboard.KeyCodes.A, right: Phaser.Input.Keyboard.KeyCodes.D
         });
-        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.eKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.xKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    }
+
+    // ----------------------------------------------------------
+    // COMBAT
+    // ----------------------------------------------------------
+    _startAttack() {
+        if (this._attacking) return;
+        this._attacking     = true;
+        this._attackTimer   = 300;
+        this._attackCooldown = 500;
+        if (window.soundManager && window.soundManager.ready) window.soundManager.playSwing();
+    }
+
+    _updateAttack(delta) {
+        this._attackTimer -= delta;
+        const px = this.player.x, py = this.player.y;
+        const dx = this._attackDir.x, dy = this._attackDir.y;
+        const hx = px + dx * 50, hy = py + dy * 50;
+
+        // Visual swing arc
+        this._attackGfx.clear();
+        const progress = 1 - (this._attackTimer / 300);
+        const alpha = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
+        this._attackGfx.fillStyle(0xd4a840, alpha * 0.7);
+        this._attackGfx.fillRect(hx - 20, hy - 20, 40, 40);
+
+        if (this._attackTimer <= 0) {
+            this._attacking = false;
+            this._attackGfx.clear();
+        }
+    }
+
+    // ----------------------------------------------------------
+    // HEALTH
+    // ----------------------------------------------------------
+    _takeDamage(amount) {
+        if (this._iframes > 0) return;
+        this._hp = Math.max(0, this._hp - amount);
+        this._heartsHUD.setHp(this._hp);
+        this._heartsHUD.flashDamage();
+        this.cameras.main.shake(200, 0.008);
+        if (window.soundManager && window.soundManager.ready) window.soundManager.playHurt();
+        this._iframes = 1200;
+        if (this._hp <= 0) this._handleDeath();
+    }
+
+    _handleDeath() {
+        if (this._transitioning) return;
+        this._transitioning = true;
+        this.player.setVelocity(0, 0);
+        this._saveGameState();
+        window.gameState.hp    = 5;
+        window.gameState.maxHp = 5;
+        this.cameras.main.fade(1200, 180, 0, 0);
+        this.time.delayedCall(1400, () => this.scene.start('GameScene'));
     }
 
     // ----------------------------------------------------------
@@ -213,9 +313,19 @@ class GameScene extends Phaser.Scene {
             { id:'tent',      x:186, y:468, range:55,  hintLabel:'Look inside', speaker:'',
               text:'Small dome tent. Sleeping bag unzipped. Dead flashlight. Nobody has been back.' },
             { id:'cabin', x:130, y:222, range:58, hintLabel:'Try door', speaker:'',
-              getText:(s) => s.collected.has('bolt_cutters')
-                ? 'The cabin is padlocked with a keyed lock — bolt cutters won\'t fit.'
-                : 'Padlocked. Hand-painted sign: RANGERS ONLY. The curtains are drawn.' },
+              getText:(s) => {
+                  if (s.collected.has('flashlight')) return 'The cabin is open. You\'ve already taken the flashlight.';
+                  if (s.collected.has('cabin_key'))  return '...';
+                  if (s.collected.has('bolt_cutters')) return 'The cabin is padlocked with a keyed lock — bolt cutters won\'t fit.';
+                  return 'Padlocked. Hand-painted sign: RANGERS ONLY. The curtains are drawn.';
+              },
+              onInteract:(s) => {
+                  if (s.collected.has('cabin_key') && !s.collected.has('flashlight')) {
+                      s.collected.delete('cabin_key'); s.collected.add('flashlight');
+                      s._showFlashlightHUD();
+                      s.dialogue.show('', 'Inside: a ranger\'s desk, maps on the wall.\nA heavy flashlight on the shelf.\n\n[ You took the flashlight ]');
+                  }
+              }},
             { id:'shed', x:130, y:752, range:58, hintLabel:'Examine', speaker:'',
               text:'Maintenance shed. Locked. Through the gap: tools, rope, a rusted paint can.' },
             { id:'bolt_cutters', x:138, y:785, range:72, hintLabel:'Take', speaker:'',
@@ -274,9 +384,21 @@ class GameScene extends Phaser.Scene {
                   }
               }},
             { id:'reg_clerk', x:490, y:162, range:65, hintLabel:'Talk', speaker:'CAMP CLERK',
-              getText:(s) => s.quest.atLeast('INSIDE')
-                  ? 'The ranger still hasn\'t checked in. Whatever you found — please be careful.'
-                  : 'Welcome to Pinebrook! Ranger Thompson hasn\'t checked in for two days.\nProbably on patrol... probably.' },
+              getText:(s) => {
+                  if (s.collected.has('flashlight') || s.collected.has('cabin_key'))
+                      return 'You found the key. The cabin is yours — Ranger Thompson would understand.';
+                  if (s.quest.atLeast('DISCOVERED_CLUE'))
+                      return 'You\'ve seen the fence, haven\'t you.\n...\nHere — ranger cabin key.\nThompson kept a flashlight in there.\nYou might need it.';
+                  if (s.quest.atLeast('INSIDE'))
+                      return 'The ranger still hasn\'t checked in. Whatever you found — please be careful.';
+                  return 'Welcome to Pinebrook! Ranger Thompson hasn\'t checked in for two days.\nProbably on patrol... probably.';
+              },
+              onInteract:(s) => {
+                  if (s.quest.atLeast('DISCOVERED_CLUE') && !s.collected.has('cabin_key') && !s.collected.has('flashlight')) {
+                      s.collected.add('cabin_key');
+                      s.dialogue.show('CAMP CLERK', '*slides a small key across the counter*\nRanger cabin — northwest corner. Take care.');
+                  }
+              }},
             { id:'dave_hamilton', x:638, y:435, range:65, hintLabel:'Talk', speaker:'DAVE (SITE B)',
               getText:(s) => s.quest.atLeast('INSIDE')
                   ? 'You were inside the compound? My wife\'s been getting headaches all week.\nIf you found proof — make sure people know.'
@@ -688,6 +810,13 @@ class GameScene extends Phaser.Scene {
         }).setScrollFactor(0).setDepth(95).setOrigin(1,0);
     }
 
+    _showFlashlightHUD() {
+        if (this._flashHUD) return;
+        this._flashHUD = this.add.text(474, 33, '| light', {
+            fontSize:'8px', fill:'#ffe066', fontFamily:'monospace'
+        }).setScrollFactor(0).setDepth(95).setOrigin(1,0);
+    }
+
     // ----------------------------------------------------------
     // GAME STATE
     // ----------------------------------------------------------
@@ -698,6 +827,8 @@ class GameScene extends Phaser.Scene {
             artifactCounts: { ...this._artifactCounts },
             gateOpen:       this._gateOpen,
             endingPlayed:   this._endingPlayed,
+            hp:             this._hp,
+            maxHp:          this._maxHp,
         };
     }
 
@@ -710,12 +841,7 @@ class GameScene extends Phaser.Scene {
 
         if (gs.questState > 0) {
             this.quest.state = gs.questState;
-            const labels = ['Explore Pinebrook Campground',
-                'Investigate the restricted facility east of camp',
-                'The gate is padlocked — find bolt cutters',
-                'Use the bolt cutters on the facility gate',
-                'Explore the facility grounds'];
-            const lbl = labels[gs.questState] || '';
+            const lbl = QUEST_LABELS[gs.questState] || '';
             if (lbl) { this.quest.label.setText(lbl); this.quest._drawBg(lbl); }
         }
         if (gs.entryX) { this.player.setPosition(gs.entryX, gs.entryY); delete gs.entryX; delete gs.entryY; }
@@ -727,7 +853,8 @@ class GameScene extends Phaser.Scene {
         if (this.collected.has('stick_raw') || this.collected.has('walking_stick')) {
             if (this._stickGfx) this._stickGfx.setVisible(false);
         }
-        if (this.collected.has('walking_stick')) this._showWalkingStickHUD();
+        if (this.collected.has('walking_stick') || this.collected.has('ember_stick')) this._showWalkingStickHUD();
+        if (this.collected.has('flashlight')) this._showFlashlightHUD();
         if (this._gateOpen) {
             if (this._gateBody)    this._gateBody.body.enable = false;
             if (this._gateGfx)     this._gateGfx.setVisible(false);

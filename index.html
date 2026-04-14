@@ -359,7 +359,7 @@
       <!-- A and B buttons -->
       <div class="action-buttons">
         <span class="btn-label btn-a-label">INTERACT</span>
-        <span class="btn-label btn-b-label">B</span>
+        <span class="btn-label btn-b-label">ATTACK</span>
         <div class="btn-circle btn-a" id="btn-a">A</div>
         <div class="btn-circle btn-b" id="btn-b">B</div>
       </div>
@@ -391,6 +391,10 @@
   <!-- 3. UI classes (no dependencies) -->
   <script src="js/ui/DialogueBox.js"></script>
   <script src="js/ui/QuestTracker.js"></script>
+  <script src="js/ui/HeartsHUD.js"></script>
+
+  <!-- 3b. Creature helper (global functions, no Phaser dependency) -->
+  <script src="js/scenes/Creature.js"></script>
 
   <!-- 4. Scenes (depend on UI classes) -->
   <script src="js/scenes/TitleScene.js"></script>
@@ -443,11 +447,16 @@
     btnA.addEventListener('touchend',    releaseA);
     btnA.addEventListener('touchcancel', releaseA);
 
-    // B button — reserved for future use
+    // B button — attack
     const btnB = document.getElementById('btn-b');
-    btnB.addEventListener('mousedown',  () => btnB.classList.add('pressed'));
-    btnB.addEventListener('mouseup',    () => btnB.classList.remove('pressed'));
-    btnB.addEventListener('mouseleave', () => btnB.classList.remove('pressed'));
+    function pressB() { window.virtualKeys.attack = true;  btnB.classList.add('pressed'); }
+    function releaseB() { window.virtualKeys.attack = false; btnB.classList.remove('pressed'); }
+    btnB.addEventListener('mousedown',   pressB);
+    btnB.addEventListener('touchstart',  pressB,   { passive: true });
+    btnB.addEventListener('mouseup',     releaseB);
+    btnB.addEventListener('mouseleave',  releaseB);
+    btnB.addEventListener('touchend',    releaseB);
+    btnB.addEventListener('touchcancel', releaseB);
 
     // Prevent context menu on long-press (important for mobile)
     document.addEventListener('contextmenu', e => e.preventDefault());

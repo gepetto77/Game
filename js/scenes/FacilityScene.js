@@ -19,6 +19,15 @@ class FacilityScene extends Phaser.Scene {
         this._localCollected = new Set((window.gameState&&window.gameState.collected)||[]);
         this._artifactCounts = (window.gameState&&window.gameState.artifactCounts)
             ? {...window.gameState.artifactCounts} : {arrowheads:0,pottery:0,tools:0};
+        // Health
+        this._hp      = (window.gameState&&window.gameState.hp    !=null)?window.gameState.hp    :5;
+        this._maxHp   = (window.gameState&&window.gameState.maxHp !=null)?window.gameState.maxHp :5;
+        this._iframes = 0;
+        this._radDmgTimer = 2000;
+        // Combat
+        this._attacking=false; this._attackTimer=0; this._attackCooldown=0;
+        this._attackDir={x:0,y:1}; this._attackWasPressed=false;
+        this._enemies=[];
 
         this.physics.world.setBounds(0,0,W,H);
         const pg=this.make.graphics({x:0,y:0,add:false});
@@ -40,10 +49,19 @@ class FacilityScene extends Phaser.Scene {
         this.cameras.main.fadeIn(700,0,0,0);
         this.physics.add.collider(this.player,this.obstacles);
 
-        this.dialogue=new DialogueBox(this);
+        this.dialogue   =new DialogueBox(this);
+        this._heartsHUD =new HeartsHUD(this,this._maxHp);
+        this._heartsHUD._hp=this._hp; this._heartsHUD._draw();
+        this._attackGfx =this.add.graphics().setDepth(11);
         this._buildInteractables();
         this._createArtifacts();
         this._setupInput();
+        this._radZones=[];
+        this._createRadZone(280,380,180,100,'ellipse');
+        this._createRadZone(600,480,200,120,'ellipse');
+        this._createRadZone(750,280,160,90,'ellipse');
+        const qs=(window.gameState&&window.gameState.questState)||0;
+        if(qs>=QUEST_STATES.INSIDE)this._spawnEnemies();
 
         this.interactHint=this.add.text(0,0,'',{
             fontSize:'9px',fill:'#ccffcc',fontFamily:'monospace',
@@ -60,7 +78,8 @@ class FacilityScene extends Phaser.Scene {
         }
     }
 
-    update(){
+    update(time,delta){
+        const dt=delta||16;
         if(this.dialogue.isVisible()){
             this.player.setVelocity(0,0);
             const down=this.eKey.isDown||window.virtualKeys.action;
@@ -80,8 +99,10 @@ class FacilityScene extends Phaser.Scene {
         if(vx!==0&&vy!==0){vx*=0.707;vy*=0.707;}
         this.player.setVelocity(vx,vy);
 
+        if(vx!==0||vy!==0)this._attackDir={x:vx>0?1:vx<0?-1:0,y:vy>0?1:vy<0?-1:0};
+
         if(vx!==0||vy!==0){
-            this._walkTimer-=16;
+            this._walkTimer-=dt;
             if(this._walkTimer<=0){this._walkTimer=180;this._walkFrame=this._walkFrame===0?1:0;}
             const tex=(vy<0&&vx===0)?'player_back':(this._walkFrame===0?'player_walkA':'player_walkB');
             this.player.setTexture(tex);
@@ -91,9 +112,23 @@ class FacilityScene extends Phaser.Scene {
             this._walkFrame=0; this._walkTimer=0;
         }
         if(vx!==0||vy!==0){
-            this._footstepTimer-=16;
+            this._footstepTimer-=dt;
             if(this._footstepTimer<=0){this._footstepTimer=340;if(window.soundManager&&window.soundManager.ready)window.soundManager.playFootstep();}
         } else {this._footstepTimer=0;}
+
+        // Attack
+        const atkDown=(this.xKey&&this.xKey.isDown)||(this.spaceKey&&this.spaceKey.isDown)||window.virtualKeys.attack;
+        const col=(window.gameState&&window.gameState.collected)||[];
+        if(atkDown&&!this._attackWasPressed&&this._attackCooldown<=0&&(col.includes('walking_stick')||col.includes('ember_stick'))){
+            this._attackWasPressed=true;this._startAttack();
+        }
+        if(!atkDown)this._attackWasPressed=false;
+        if(this._attackCooldown>0)this._attackCooldown-=dt;
+        if(this._attacking)this._updateAttack(dt);
+        // iframes
+        if(this._iframes>0){this._iframes-=dt;this.player.setAlpha(Math.sin(this._iframes*0.025)>0?1:0.3);}
+        else this.player.setAlpha(1);
+        this._updateEnemies(dt);
 
         const nearest=this._nearestInteractable();
         if(nearest){
@@ -126,6 +161,7 @@ class FacilityScene extends Phaser.Scene {
             }
         }
         if(!down)this._actionWasPressed=false;
+        this._checkRadZones(dt);
         this._checkExits();
         this._checkEndingInput();
     }
@@ -160,19 +196,109 @@ class FacilityScene extends Phaser.Scene {
         if(!window.gameState)window.gameState={};
         const prev=new Set(window.gameState.collected||[]);
         this._localCollected.forEach(c=>prev.add(c));
-        window.gameState.collected=Array.from(prev);
+        window.gameState.collected  =Array.from(prev);
         window.gameState.artifactCounts={...this._artifactCounts};
         window.gameState.endingPlayed=this._endingPlayed;
-        window.gameState.gateOpen=true; // always stays open once entered
+        window.gameState.gateOpen=true;
+        window.gameState.hp    =this._hp;
+        window.gameState.maxHp =this._maxHp;
     }
 
     _setupInput(){
-        this.cursors=this.input.keyboard.createCursorKeys();
-        this.wasd=this.input.keyboard.addKeys({
+        this.cursors  =this.input.keyboard.createCursorKeys();
+        this.wasd     =this.input.keyboard.addKeys({
             up:Phaser.Input.Keyboard.KeyCodes.W,down:Phaser.Input.Keyboard.KeyCodes.S,
             left:Phaser.Input.Keyboard.KeyCodes.A,right:Phaser.Input.Keyboard.KeyCodes.D
         });
-        this.eKey=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.eKey     =this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.xKey     =this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+        this.spaceKey =this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    }
+
+    // --- Combat ---
+    _startAttack(){
+        if(this._attacking)return;
+        this._attacking=true;this._attackTimer=300;this._attackCooldown=500;
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playSwing();
+    }
+    _updateAttack(delta){
+        this._attackTimer-=delta;
+        const hx=this.player.x+this._attackDir.x*50,hy=this.player.y+this._attackDir.y*50;
+        this._attackGfx.clear();
+        const p=1-(this._attackTimer/300),a=p<0.5?p*2:(1-p)*2;
+        this._attackGfx.fillStyle(0xd4a840,a*0.7);this._attackGfx.fillRect(hx-20,hy-20,40,40);
+        for(const e of this._enemies){
+            if(e.isDead||e._hitThisSwing)continue;
+            if(Phaser.Math.Distance.Between(hx,hy,e.x,e.y)<50){e._hitThisSwing=true;this._hitEnemy(e);}
+        }
+        if(this._attackTimer<=0){
+            this._attacking=false;this._attackGfx.clear();
+            this._enemies.forEach(e=>e._hitThisSwing=false);
+        }
+    }
+    _hitEnemy(e){
+        const col=(window.gameState&&window.gameState.collected)||[];
+        e.hp-=col.includes('ember_stick')?2:1;
+        e.state='STUNNED';e.stunnedTimer=400;
+        if(e.hp<=0)this._killEnemy(e);
+    }
+    _killEnemy(e){
+        e.isDead=true;e.state='DEAD';drawCreature(e);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playEnemyDie();
+        this.time.delayedCall(500,()=>{e._gfx.destroy();e._hpGfx.destroy();});
+    }
+    _spawnEnemies(){
+        this._enemies.push(createCreature(this,'FACILITY_GUARD',480,350));
+    }
+    _updateEnemies(delta){
+        for(const e of this._enemies){
+            const r=updateCreature(e,this.player.x,this.player.y,delta);
+            drawCreature(e);
+            if(r&&r.dealDamage)this._takeDamage(r.damage);
+        }
+    }
+
+    // --- Health ---
+    _takeDamage(amount){
+        if(this._iframes>0)return;
+        this._hp=Math.max(0,this._hp-amount);
+        this._heartsHUD.setHp(this._hp);this._heartsHUD.flashDamage();
+        this.cameras.main.shake(200,0.008);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playHurt();
+        this._iframes=1200;
+        if(this._hp<=0)this._handleDeath();
+    }
+    _handleDeath(){
+        if(this._transitioning)return;
+        this._transitioning=true;
+        this.player.setVelocity(0,0);
+        this._saveState();window.gameState.hp=5;window.gameState.maxHp=5;
+        this.cameras.main.fade(1200,180,0,0);
+        this.time.delayedCall(1400,()=>this.scene.start('GameScene'));
+    }
+
+    // --- Radiation ---
+    _createRadZone(x,y,w,h,shape){
+        const gfx=this.add.graphics().setDepth(2.5);
+        gfx.fillStyle(0xff4400,0.08);
+        if(shape==='ellipse')gfx.fillEllipse(x,y,w,h); else gfx.fillRect(x-w/2,y-h/2,w,h);
+        this.tweens.add({targets:gfx,alpha:{from:0.08,to:0.22},yoyo:true,repeat:-1,duration:1200});
+        this._radZones.push({x,y,w,h,shape});
+    }
+    _checkRadZones(delta){
+        const col=(window.gameState&&window.gameState.collected)||[];
+        if(col.includes('respirator'))return;
+        let inZone=false;
+        for(const z of this._radZones){
+            const inside=z.shape==='ellipse'
+                ?Math.pow((this.player.x-z.x)/(z.w/2),2)+Math.pow((this.player.y-z.y)/(z.h/2),2)<=1
+                :(this.player.x>=z.x-z.w/2&&this.player.x<=z.x+z.w/2&&this.player.y>=z.y-z.h/2&&this.player.y<=z.y+z.h/2);
+            if(inside){inZone=true;break;}
+        }
+        if(inZone){
+            this._radDmgTimer-=delta;
+            if(this._radDmgTimer<=0){this._radDmgTimer=2000;this._takeDamage(1);}
+        } else {this._radDmgTimer=Math.max(this._radDmgTimer,500);}
     }
 
     // ----------------------------------------------------------
@@ -355,16 +481,67 @@ class FacilityScene extends Phaser.Scene {
               text:'A company truck, windows cracked, tyres flat.\nThe cab door is open.\nA coffee mug is still in the cupholder.' },
             { id:'control_panel', x:220, y:285, range:70, hintLabel:'Access terminal', speaker:'TERMINAL',
               getText:(s)=>{
-                  const c=col();
-                  if(s._endingPlayed) return '[SIGNAL LOST]\n[SIGNAL LOST]\n[SIGNAL LOST]';
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  const qs=(window.gameState&&window.gameState.questState)||0;
                   if(c.includes('facility_log'))
-                      return 'PINEBROOK NUCLEAR RESERVE — FACILITY LOG — SECTOR 7\n\nCoolant loop: OFFLINE (14d 11h)\nCore temp: CRITICAL\nContainment: PARTIAL\n\nDr. Chen\'s log confirms everything.\nThis needs to get out.\n\n[ You have all the evidence. ]';
-                  return 'PINEBROOK NUCLEAR RESERVE — FACILITY LOG — SECTOR 7\n\nBreach: coolant line fracture\nDay 14 — Status: UNRESOLVED\n\nThis terminal is live.\nSomething is very wrong here.\nYou need the full picture first — find the source.';
+                      return 'PINEBROOK NUCLEAR RESERVE — FACILITY LOG — SECTOR 7\n\nCoolant loop: OFFLINE (14d 11h)\nCore temp: CRITICAL\nContainment: PARTIAL\n\n[ facility_log downloaded ]\n\nBring this to Frank.\nHe\'ll know what it means.';
+                  return 'PINEBROOK NUCLEAR RESERVE — FACILITY LOG — SECTOR 7\n\nBreach: coolant line fracture\nDay 14 — Status: UNRESOLVED\n\nThis terminal has evidence of a covered-up meltdown.\nDownloading facility log...';
               },
               onInteract:(s)=>{
-                  if(!s._endingPlayed&&col().includes('facility_log')) s._triggerEnding();
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(!c.includes('facility_log')){
+                      s._localCollected.add('facility_log');
+                      window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'facility_log'])];
+                      if(window.gameState)window.gameState.questState=Math.max((window.gameState.questState||0),QUEST_STATES.FOUND_LOG);
+                      s.cameras.main.flash(500,0,255,0,false);
+                      s.time.delayedCall(200,()=>s.dialogue.show('TERMINAL',
+                          '[ DOWNLOAD COMPLETE ]\n\nFacility log — 14 days of readings.\nCore temperature, coolant status.\nProject Emberlight termination code.\n\nTake this to Frank.\nHe knows the land. He\'ll know what to do.'));
+                  }
+              }},
+            // Equipment shed — respirator
+            { id:'equipment_shed', x:820, y:600, range:68, hintLabel:'Search shed', speaker:'SHED',
+              getText:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(c.includes('respirator')) return 'The shed is mostly empty now.';
+                  return 'A rusted metal equipment shed.\nMost hazmat gear rotted through.\nOne respirator on a hook — filter looks intact.';
+              },
+              onInteract:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(!c.includes('respirator')){
+                      s._localCollected.add('respirator');
+                      window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'respirator'])];
+                      s.dialogue.show('','[ You took the respirator ]\nThe filter smells of rubber and age.\nBetter than nothing.');
+                      if(!s._respHUD)s._respHUD=s.add.text(474,44,'| mask',{fontSize:'8px',fill:'#88ccff',fontFamily:'monospace'}).setScrollFactor(0).setDepth(95).setOrigin(1,0);
+                  }
+              }},
+            // Copper wire — for ember-stick upgrade via Frank
+            { id:'copper_wire', x:660, y:290, range:56, hintLabel:'Pick up', speaker:'',
+              getText:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(c.includes('copper_wire')) return null;
+                  return 'A coil of copper wire, wrapped around a corroded pipe.\nSeems salvageable.';
+              },
+              onInteract:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(!c.includes('copper_wire')){
+                      s._localCollected.add('copper_wire');
+                      window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'copper_wire'])];
+                      s.interactables.find(o=>o.id==='copper_wire').disabled=true;
+                      s.dialogue.show('','[ You took the copper wire ]\nStill conductive. Could be useful.');
+                  }
               }},
         ];
+        // Draw copper wire visual (small coil graphic)
+        const cwc=(window.gameState&&window.gameState.collected)||[];
+        if(!cwc.includes('copper_wire')){
+            const cwg=this.add.graphics().setDepth(3);
+            cwg.lineStyle(2,0xcc8833,0.9);
+            cwg.strokeCircle(660,290,7); cwg.strokeCircle(660,290,4);
+            cwg.lineStyle(1,0xffaa44,0.6); cwg.lineBetween(660,283,660,278);
+            const cwGlow=this.add.graphics().setDepth(2);
+            cwGlow.fillStyle(0xffcc44,0.15); cwGlow.fillCircle(660,290,14);
+            this.tweens.add({targets:cwGlow,alpha:{from:0.15,to:0.04},yoyo:true,repeat:-1,duration:1500});
+        }
     }
 
     _createArtifacts(){

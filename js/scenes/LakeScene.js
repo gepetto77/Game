@@ -15,6 +15,18 @@ class LakeScene extends Phaser.Scene {
         this._transitioning = false;
         this._artifactCounts = (window.gameState && window.gameState.artifactCounts)
             ? { ...window.gameState.artifactCounts } : { arrowheads:0, pottery:0, tools:0 };
+        // Health
+        this._hp      = (window.gameState && window.gameState.hp    != null) ? window.gameState.hp    : 5;
+        this._maxHp   = (window.gameState && window.gameState.maxHp != null) ? window.gameState.maxHp : 5;
+        this._iframes = 0;
+        this._radDmgTimer = 2000;
+        // Combat
+        this._attacking      = false;
+        this._attackTimer    = 0;
+        this._attackCooldown = 0;
+        this._attackDir      = { x: 0, y: 1 };
+        this._attackWasPressed = false;
+        this._enemies = [];
 
         this.physics.world.setBounds(0, 0, W, H);
         const pg = this.make.graphics({x:0,y:0,add:false});
@@ -35,10 +47,22 @@ class LakeScene extends Phaser.Scene {
         this.cameras.main.fadeIn(700, 0, 0, 0);
         this.physics.add.collider(this.player, this.obstacles);
 
-        this.dialogue = new DialogueBox(this);
+        this.dialogue   = new DialogueBox(this);
+        this._heartsHUD = new HeartsHUD(this, this._maxHp);
+        this._heartsHUD._hp = this._hp; this._heartsHUD._draw();
+        this._attackGfx = this.add.graphics().setDepth(11);
         this._buildInteractables();
         this._createArtifacts();
         this._setupInput();
+
+        // Radiation zones over contamination patches
+        this._radZones = [];
+        this._createRadZone(390, 480, 180, 90, 'ellipse');
+        this._createRadZone(360, 380, 140, 70, 'ellipse');
+
+        // Enemies spawn after entering facility
+        const qs = (window.gameState && window.gameState.questState) || 0;
+        if (qs >= QUEST_STATES.INSIDE) this._spawnEnemies();
 
         this.interactHint = this.add.text(0, 0, '', {
             fontSize:'9px', fill:'#ffffff', fontFamily:'monospace',
@@ -56,7 +80,8 @@ class LakeScene extends Phaser.Scene {
         }
     }
 
-    update() {
+    update(time, delta) {
+        const dt = delta || 16;
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0,0);
             const down = this.eKey.isDown || window.virtualKeys.action;
@@ -76,8 +101,10 @@ class LakeScene extends Phaser.Scene {
         if(vx!==0&&vy!==0){vx*=0.707;vy*=0.707;}
         this.player.setVelocity(vx,vy);
 
+        if(vx!==0||vy!==0) this._attackDir={x:vx>0?1:vx<0?-1:0,y:vy>0?1:vy<0?-1:0};
+
         if(vx!==0||vy!==0){
-            this._walkTimer-=16;
+            this._walkTimer-=dt;
             if(this._walkTimer<=0){this._walkTimer=180;this._walkFrame=this._walkFrame===0?1:0;}
             const tex=(vy<0&&vx===0)?'player_back':(this._walkFrame===0?'player_walkA':'player_walkB');
             this.player.setTexture(tex);
@@ -87,9 +114,26 @@ class LakeScene extends Phaser.Scene {
             this._walkFrame=0; this._walkTimer=0;
         }
         if(vx!==0||vy!==0){
-            this._footstepTimer-=16;
+            this._footstepTimer-=dt;
             if(this._footstepTimer<=0){this._footstepTimer=340;if(window.soundManager&&window.soundManager.ready)window.soundManager.playFootstep();}
         } else {this._footstepTimer=0;}
+
+        // Attack input
+        const atkDown=(this.xKey&&this.xKey.isDown)||(this.spaceKey&&this.spaceKey.isDown)||window.virtualKeys.attack;
+        const col=(window.gameState&&window.gameState.collected)||[];
+        if(atkDown&&!this._attackWasPressed&&this._attackCooldown<=0&&(col.includes('walking_stick')||col.includes('ember_stick'))){
+            this._attackWasPressed=true; this._startAttack();
+        }
+        if(!atkDown)this._attackWasPressed=false;
+        if(this._attackCooldown>0)this._attackCooldown-=dt;
+        if(this._attacking)this._updateAttack(dt);
+
+        // Invincibility frames
+        if(this._iframes>0){this._iframes-=dt;this.player.setAlpha(Math.sin(this._iframes*0.025)>0?1:0.3);}
+        else this.player.setAlpha(1);
+
+        // Enemy AI
+        this._updateEnemies(dt);
 
         const nearest = this._nearestInteractable();
         if(nearest){
@@ -112,6 +156,7 @@ class LakeScene extends Phaser.Scene {
         }
         if(!down)this._actionWasPressed=false;
 
+        this._checkRadZones(dt);
         this._checkExits();
     }
 
@@ -145,18 +190,108 @@ class LakeScene extends Phaser.Scene {
         if(!window.gameState) window.gameState={};
         const gs = window.gameState;
         const base = Array.from(new Set([...(gs.collected||[]),...Array.from(this._localCollected||[])]));
-        gs.collected = base;
+        gs.collected      = base;
         gs.artifactCounts = {...this._artifactCounts};
+        gs.hp             = this._hp;
+        gs.maxHp          = this._maxHp;
     }
 
     _setupInput() {
-        this.cursors=this.input.keyboard.createCursorKeys();
-        this.wasd=this.input.keyboard.addKeys({
-            up:Phaser.Input.Keyboard.KeyCodes.W,down:Phaser.Input.Keyboard.KeyCodes.S,
-            left:Phaser.Input.Keyboard.KeyCodes.A,right:Phaser.Input.Keyboard.KeyCodes.D
+        this.cursors  = this.input.keyboard.createCursorKeys();
+        this.wasd     = this.input.keyboard.addKeys({
+            up:Phaser.Input.Keyboard.KeyCodes.W, down:Phaser.Input.Keyboard.KeyCodes.S,
+            left:Phaser.Input.Keyboard.KeyCodes.A, right:Phaser.Input.Keyboard.KeyCodes.D
         });
-        this.eKey=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.eKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.xKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this._localCollected = new Set((window.gameState&&window.gameState.collected)||[]);
+    }
+
+    // --- Combat ---
+    _startAttack() {
+        if(this._attacking)return;
+        this._attacking=true; this._attackTimer=300; this._attackCooldown=500;
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playSwing();
+    }
+    _updateAttack(delta) {
+        this._attackTimer-=delta;
+        const hx=this.player.x+this._attackDir.x*50, hy=this.player.y+this._attackDir.y*50;
+        this._attackGfx.clear();
+        const p=1-(this._attackTimer/300), a=p<0.5?p*2:(1-p)*2;
+        this._attackGfx.fillStyle(0xd4a840,a*0.7); this._attackGfx.fillRect(hx-20,hy-20,40,40);
+        for(const e of this._enemies){
+            if(e.isDead||e._hitThisSwing)continue;
+            if(Phaser.Math.Distance.Between(hx,hy,e.x,e.y)<50){e._hitThisSwing=true;this._hitEnemy(e);}
+        }
+        if(this._attackTimer<=0){
+            this._attacking=false; this._attackGfx.clear();
+            this._enemies.forEach(e=>e._hitThisSwing=false);
+        }
+    }
+    _hitEnemy(e) {
+        const col=(window.gameState&&window.gameState.collected)||[];
+        e.hp-=col.includes('ember_stick')?2:1;
+        e.state='STUNNED'; e.stunnedTimer=400;
+        if(e.hp<=0)this._killEnemy(e);
+    }
+    _killEnemy(e) {
+        e.isDead=true; e.state='DEAD'; drawCreature(e);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playEnemyDie();
+        this.time.delayedCall(500,()=>{e._gfx.destroy();e._hpGfx.destroy();});
+    }
+    _spawnEnemies() {
+        [[340,480],[400,510]].forEach(([ex,ey])=>this._enemies.push(createCreature(this,'MUTANT_FISH',ex,ey)));
+    }
+    _updateEnemies(delta) {
+        for(const e of this._enemies){
+            const r=updateCreature(e,this.player.x,this.player.y,delta);
+            drawCreature(e);
+            if(r&&r.dealDamage)this._takeDamage(r.damage);
+        }
+    }
+
+    // --- Health ---
+    _takeDamage(amount) {
+        if(this._iframes>0)return;
+        this._hp=Math.max(0,this._hp-amount);
+        this._heartsHUD.setHp(this._hp); this._heartsHUD.flashDamage();
+        this.cameras.main.shake(200,0.008);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playHurt();
+        this._iframes=1200;
+        if(this._hp<=0)this._handleDeath();
+    }
+    _handleDeath() {
+        if(this._transitioning)return;
+        this._transitioning=true;
+        this.player.setVelocity(0,0);
+        this._saveState(); window.gameState.hp=5; window.gameState.maxHp=5;
+        this.cameras.main.fade(1200,180,0,0);
+        this.time.delayedCall(1400,()=>this.scene.start('GameScene'));
+    }
+
+    // --- Radiation ---
+    _createRadZone(x,y,w,h,shape) {
+        const gfx=this.add.graphics().setDepth(2.5);
+        gfx.fillStyle(0xff4400,0.08);
+        if(shape==='ellipse')gfx.fillEllipse(x,y,w,h); else gfx.fillRect(x-w/2,y-h/2,w,h);
+        this.tweens.add({targets:gfx,alpha:{from:0.08,to:0.22},yoyo:true,repeat:-1,duration:1200});
+        this._radZones.push({x,y,w,h,shape});
+    }
+    _checkRadZones(delta) {
+        const col=(window.gameState&&window.gameState.collected)||[];
+        if(col.includes('respirator'))return;
+        let inZone=false;
+        for(const z of this._radZones){
+            const inside=z.shape==='ellipse'
+                ?Math.pow((this.player.x-z.x)/(z.w/2),2)+Math.pow((this.player.y-z.y)/(z.h/2),2)<=1
+                :(this.player.x>=z.x-z.w/2&&this.player.x<=z.x+z.w/2&&this.player.y>=z.y-z.h/2&&this.player.y<=z.y+z.h/2);
+            if(inside){inZone=true;break;}
+        }
+        if(inZone){
+            this._radDmgTimer-=delta;
+            if(this._radDmgTimer<=0){this._radDmgTimer=2000;this._takeDamage(1);}
+        } else {this._radDmgTimer=Math.max(this._radDmgTimer,500);}
     }
 
     // ----------------------------------------------------------
@@ -293,12 +428,25 @@ class LakeScene extends Phaser.Scene {
               text:'The water here smells chemical. An oily sheen catches the light.\nThis isn\'t natural algae.' },
             { id:'fisherman',   x:654, y:400, range:70, hintLabel:'Talk', speaker:'OLD PETE',
               getText:(s)=>{
-                  const c=col();
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  const qs=(window.gameState&&window.gameState.questState)||0;
+                  if(c.includes('boat_key'))
+                      return 'Island due east — I saw lights there in \'92. Nobody\'s checked since.\nThe boathouse key is yours. Take the rowboat.';
+                  if(qs>=QUEST_STATES.INSIDE&&!c.includes('boat_key'))
+                      return 'You got in there. I believe you now.\n*reaches into his tackle box*\nThat\'s the boathouse key.\nThere\'s an island due east — I saw lights there in \'92.\nNobody\'s checked since.';
                   if(c.includes('facility_log'))
                       return 'You found proof.\nI always knew — forty years fishin\' this lake.\nGet that out to people.';
-                  if(c.includes('bolt_cutters')||c.includes('INSIDE'))
+                  if(c.includes('bolt_cutters'))
                       return 'You found a way in there, didn\'t you.\nSame look I had in \'89.\nBe careful — those people don\'t like witnesses.';
                   return 'Been fishin\' this lake forty years.\nUsed to catch a full basket by noon.\n...Haven\'t eaten anything from here since \'91.\nWater changed. Fish started dyin\'.\nNobody official will say why.';
+              },
+              onInteract:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  const qs=(window.gameState&&window.gameState.questState)||0;
+                  if(qs>=QUEST_STATES.INSIDE&&!c.includes('boat_key')){
+                      s._localCollected.add('boat_key');
+                      window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'boat_key'])];
+                  }
               }},
             { id:'mia_lake',   x:290, y:415, range:65, hintLabel:'Talk', speaker:'MIA',
               getText:(s)=>{
@@ -308,6 +456,23 @@ class LakeScene extends Phaser.Scene {
                   if(c.includes('bolt_cutters'))
                       return 'That green sheen — Cherenkov-adjacent fluorescence.\nSomething radioactive is leaching into the water table.\nThe facility is the only source for miles.';
                   return 'I\'ve been collecting water samples all week.\nThe pH is wrong. The phosphorescence at night isn\'t bioluminescence.\nI think it\'s coming from the facility east of camp.\nMy parents think I\'m overreacting.';
+              }},
+            { id:'boat_shack_door', x:820, y:192, range:68, hintLabel:'Try door', speaker:'',
+              getText:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(c.includes('chen_disk'))return 'You\'ve already recovered what was here.';
+                  if(c.includes('boat_key'))return '...';
+                  return 'Boathouse door — padlocked. A rowboat is chained inside, visible through the gap.';
+              },
+              onInteract:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(c.includes('boat_key')&&!c.includes('chen_disk')){
+                      s._localCollected.add('chen_disk');
+                      window.gameState.collected=[...new Set([...c,'chen_disk'])];
+                      s.cameras.main.shake(300,0.004);
+                      s.dialogue.show('',
+                          'You row out to the island.\n\nA concrete survey marker, half-submerged.\nStenciled: "EMBERLIGHT STATION ALPHA — 1989"\n\nBelow it — a waterproof case. Still sealed.\nInside: a data disk. Labeled:\n"DR. CHEN — PERSONAL RECORD"\n\n[ You found Dr. Chen\'s disk ]');
+                  }
               }},
             { id:'notice_board_lake', x:140, y:408, range:60, hintLabel:'Read', speaker:'NOTICE',
               text:'PINEBROOK LAKE — NO SWIMMING\n\n"Due to elevated algae levels"\n\n[handwritten below]\n"It\'s not algae. — M"' },

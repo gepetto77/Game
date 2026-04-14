@@ -18,6 +18,11 @@ class Sector7Scene extends Phaser.Scene {
         this._walkTimer  = 0;
         this._returning  = false;
         this._redPulse   = 0;
+        // Health
+        this._hp      = (window.gameState&&window.gameState.hp    !=null)?window.gameState.hp    :5;
+        this._maxHp   = (window.gameState&&window.gameState.maxHp !=null)?window.gameState.maxHp :5;
+        this._iframes = 0;
+        this._radDmgTimer = 2000;
 
         this._drawRoom(W, H);
 
@@ -34,6 +39,8 @@ class Sector7Scene extends Phaser.Scene {
         this.cameras.main.fadeIn(1400, 0, 0, 0);
 
         this.dialogue = new DialogueBox(this);
+        this._heartsHUD = new HeartsHUD(this, this._maxHp);
+        this._heartsHUD._hp = this._hp; this._heartsHUD._draw();
 
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ffcccc', fontFamily: 'monospace',
@@ -41,6 +48,7 @@ class Sector7Scene extends Phaser.Scene {
         }).setDepth(50).setVisible(false);
 
         this._buildInteractables();
+        this._drawTransmitter();
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys({
@@ -49,7 +57,13 @@ class Sector7Scene extends Phaser.Scene {
             left:  Phaser.Input.Keyboard.KeyCodes.A,
             right: Phaser.Input.Keyboard.KeyCodes.D
         });
-        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.eKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.xKey     = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        // Whole-room radiation zone
+        this._radZones = [];
+        this._createRadZone(400, 180, 800, 360, 'rect');
 
         // Red emergency light overlay (pulsing — redrawn each frame)
         this._redOverlay = this.add.graphics().setDepth(18);
@@ -62,6 +76,7 @@ class Sector7Scene extends Phaser.Scene {
 
     // ----------------------------------------------------------
     update(time, delta) {
+        const dt = delta || 16;
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0, 0);
             const down = this.eKey.isDown || (window.virtualKeys && window.virtualKeys.action);
@@ -84,7 +99,7 @@ class Sector7Scene extends Phaser.Scene {
 
         // Walk animation
         if (vx || vy) {
-            this._walkTimer -= 16;
+            this._walkTimer -= dt;
             if (this._walkTimer <= 0) { this._walkTimer = 180; this._walkFrame ^= 1; }
             const tex = (vy < 0 && !vx) ? 'player_back'
                 : (this._walkFrame ? 'player_walkA' : 'player_walkB');
@@ -96,12 +111,19 @@ class Sector7Scene extends Phaser.Scene {
             this._walkFrame = 0; this._walkTimer = 0;
         }
 
+        // iframes flash
+        if (this._iframes > 0) { this._iframes -= dt; this.player.setAlpha(Math.sin(this._iframes * 0.025) > 0 ? 1 : 0.3); }
+        else this.player.setAlpha(1);
+
         // Red emergency light pulse
-        this._redPulse = (this._redPulse + delta * 0.0025) % (Math.PI * 2);
+        this._redPulse = (this._redPulse + dt * 0.0025) % (Math.PI * 2);
         const rA = 0.05 + Math.sin(this._redPulse) * 0.04;
         this._redOverlay.clear();
         this._redOverlay.fillStyle(0xff1100, rA);
         this._redOverlay.fillRect(0, 0, 800, 360);
+
+        // Radiation zone (whole room)
+        this._checkRadZones(dt);
 
         // Interact hint
         const near = this._nearest();
@@ -317,15 +339,39 @@ class Sector7Scene extends Phaser.Scene {
                 speaker: 'DR. M. CHEN',
                 text: () => {
                     const c = col();
+                    const qs = (window.gameState&&window.gameState.questState)||0;
                     if (!c.includes('facility_log')) {
-                        // Grant the item
+                        // Grant the item and advance quest
                         if (window.gameState) {
                             if (!window.gameState.collected) window.gameState.collected = [];
-                            window.gameState.collected.push('facility_log');
+                            if (!window.gameState.collected.includes('facility_log'))
+                                window.gameState.collected.push('facility_log');
+                            window.gameState.questState = Math.max(qs, QUEST_STATES.FOUND_LOG);
                         }
-                        return 'PERSONAL LOG — DR. MIRIAM CHEN\n\nDay 12:\nFiled three incident reports. Management:\n"Situation contained. Not your concern."\n\nDay 14:\nCoolant loop offline. I predicted this.\nThey locked me out of the system.\n\nDay 15:\nI left a copy at the ranger station.\nIf you are reading this —\n\nThe lake is poisoned.\n\nGet this out.\n\n[ FACILITY LOG SAVED ]';
+                        return 'PERSONAL LOG — DR. MIRIAM CHEN\n\nDay 12:\nFiled three incident reports. Management:\n"Situation contained. Not your concern."\n\nDay 14:\nCoolant loop offline. I predicted this.\nThey locked me out of the system.\n\nDay 15:\nI left a copy at the ranger station.\nIf you are reading this —\n\nThe lake is poisoned.\n\nGet this out.\n\n[ FACILITY LOG SAVED ]\nFind Frank. He knows what to do.';
                     }
-                    return 'DR. CHEN\'S TERMINAL — log already read.\n\n"The lake is poisoned.\nGet this out."';
+                    if (qs >= QUEST_STATES.DEEP_CAVE)
+                        return 'DR. CHEN\'S TERMINAL — log already downloaded.\n\nThe transmitter is in the north corner.\nThe signal will reach the state EPA.\nActivate it.';
+                    return 'DR. CHEN\'S TERMINAL — log already read.\n\n"The lake is poisoned.\nGet this out."\n\nFind Frank in the wilderness.';
+                }
+            },
+            {
+                id: 'transmitter', x: 120, y: 80, range: 68, label: 'Examine transmitter',
+                speaker: 'TRANSMITTER',
+                text: () => {
+                    const qs = (window.gameState&&window.gameState.questState)||0;
+                    if (qs >= QUEST_STATES.EXPOSED)
+                        return 'SIGNAL TRANSMITTED.\n\nThe data is broadcasting on emergency\nfrequency 156.8 MHz.\n\nEPA hotline, state EPA, Coast Guard.\nAll receiving.\n\nIt is done.';
+                    if (qs >= QUEST_STATES.DEEP_CAVE)
+                        return 'An emergency broadcast transmitter.\nDust-covered but functional.\nDr. Chen must have planned for this.\n\nSurvey map shows the antenna is still live.\nFacility log loaded into buffer.\n\n[ TRANSMIT SIGNAL? ]';
+                    return 'An emergency transmitter in the corner.\nDust-covered. You\'re not sure what it\'s for yet.\n\nCome back when you know more.';
+                },
+                after: (s) => {
+                    const qs = (window.gameState&&window.gameState.questState)||0;
+                    if (qs >= QUEST_STATES.DEEP_CAVE && qs < QUEST_STATES.EXPOSED) {
+                        window.gameState.questState = QUEST_STATES.EXPOSED;
+                        s._triggerEnding();
+                    }
                 }
             },
             {
@@ -343,6 +389,99 @@ class Sector7Scene extends Phaser.Scene {
     }
 
     // ----------------------------------------------------------
+    // --- Health ---
+    _takeDamage(amount){
+        if(this._iframes>0)return;
+        this._hp=Math.max(0,this._hp-amount);
+        this._heartsHUD.setHp(this._hp); this._heartsHUD.flashDamage();
+        this.cameras.main.shake(200,0.008);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playHurt();
+        this._iframes=1200;
+        if(this._hp<=0)this._handleDeath();
+    }
+    _handleDeath(){
+        if(this._returning)return;
+        this._returning=true;
+        this.player.setVelocity(0,0);
+        this._saveState(); window.gameState.hp=5; window.gameState.maxHp=5;
+        this.cameras.main.fade(1200,180,0,0);
+        this.time.delayedCall(1400,()=>this.scene.start('GameScene'));
+    }
+
+    // --- Radiation ---
+    _createRadZone(x,y,w,h,shape){
+        const gfx=this.add.graphics().setDepth(2.5);
+        gfx.fillStyle(0xff4400,0.06);
+        if(shape==='ellipse')gfx.fillEllipse(x,y,w,h); else gfx.fillRect(x-w/2,y-h/2,w,h);
+        this.tweens.add({targets:gfx,alpha:{from:0.06,to:0.18},yoyo:true,repeat:-1,duration:1400});
+        this._radZones.push({x,y,w,h,shape});
+    }
+    _checkRadZones(delta){
+        const col=(window.gameState&&window.gameState.collected)||[];
+        if(col.includes('respirator'))return;
+        let inZone=false;
+        for(const z of this._radZones){
+            const inside=z.shape==='ellipse'
+                ?Math.pow((this.player.x-z.x)/(z.w/2),2)+Math.pow((this.player.y-z.y)/(z.h/2),2)<=1
+                :(this.player.x>=z.x-z.w/2&&this.player.x<=z.x+z.w/2&&this.player.y>=z.y-z.h/2&&this.player.y<=z.y+z.h/2);
+            if(inside){inZone=true;break;}
+        }
+        if(inZone){
+            this._radDmgTimer-=delta;
+            if(this._radDmgTimer<=0){this._radDmgTimer=3000;this._takeDamage(1);}
+        } else {this._radDmgTimer=Math.max(this._radDmgTimer,500);}
+    }
+
+    _saveState(){
+        if(!window.gameState)window.gameState={};
+        window.gameState.hp    = this._hp;
+        window.gameState.maxHp = this._maxHp;
+    }
+
+    // --- New ending ---
+    _triggerEnding(){
+        this._returning=true;
+        this.player.setVelocity(0,0);
+        this._saveState();
+        const seq=[
+            ['TRANSMITTER','BROADCAST INITIATED\n\nFrequency: 156.8 MHz\nTarget: EPA Emergency Line, State Office,\nUS Coast Guard Sector 5\n\nData package: FACILITY LOG — 14 DAYS\nStatus: TRANSMITTING...'],
+            ['TRANSMITTER','TRANSMISSION COMPLETE\n\nBroadcast ID: NR-PINE-SEC7-001\nReceipt confirmed: 3 agencies\n\nPinebrook Nuclear Reserve — Sector 7\nCoolant breach confirmed.\nLake contamination: DOCUMENTED.\n\nAuthorities en route.'],
+            ['','Outside, through the ventilation shaft,\nyou can almost hear the wind off the lake.\n\nSomewhere above, Marcus Cole\'s campfire\nhas gone cold.\n\nBut the signal is out.\nThe lake has a name now.\nAnd names can\'t be unspoken.'],
+            ['','PINEBROOK MYSTERY\n\n— COMPLETED —\n\n\nThanks for playing.'],
+        ];
+        let i=0;
+        this.cameras.main.flash(600,0,255,60,false);
+        const advance=()=>{
+            if(i>=seq.length){
+                this.cameras.main.fade(2000,0,0,0);
+                this.time.delayedCall(2200,()=>this.scene.start('TitleScene'));
+                return;
+            }
+            this.dialogue.show(seq[i][0],seq[i][1],()=>{i++;advance();});
+        };
+        this.time.delayedCall(600,()=>advance());
+    }
+
+    _drawTransmitter(){
+        const tx=120,ty=80;
+        const g=this.add.graphics().setDepth(5);
+        // Base unit
+        g.fillStyle(0x1e2830); g.fillRect(tx-28,ty-18,56,36);
+        g.lineStyle(1,0x2a3840); g.strokeRect(tx-28,ty-18,56,36);
+        // Screen
+        g.fillStyle(0x001800); g.fillRect(tx-22,ty-12,30,24);
+        g.fillStyle(0x004400,0.5); for(let ly=ty-10;ly<ty+12;ly+=5)g.fillRect(tx-21,ly,28,2);
+        // Status light
+        g.fillStyle(0x00ff44,0.9); g.fillCircle(tx+18,ty-8,4);
+        this.tweens.add({targets:g,alpha:{from:0.7,to:1},yoyo:true,repeat:-1,duration:800});
+        // Antenna
+        g.lineStyle(2,0x446655); g.lineBetween(tx+20,ty-18,tx+20,ty-42);
+        g.lineStyle(1,0x446655); g.lineBetween(tx+20,ty-42,tx+30,ty-34);
+        g.lineStyle(1,0x446655); g.lineBetween(tx+20,ty-42,tx+10,ty-34);
+        // Label
+        this.add.text(tx,ty+22,'EMRG. TRANSMITTER',{fontSize:'5px',fill:'#446655',fontFamily:'monospace'}).setDepth(6).setOrigin(0.5,0);
+    }
+
     _returnToCave() {
         if (this._returning) return;
         this._returning = true;

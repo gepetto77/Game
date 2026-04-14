@@ -11,7 +11,8 @@ window.virtualKeys = {
     down:   false,
     left:   false,
     right:  false,
-    action: false  // maps to [A] button / [E] key
+    action: false,  // maps to [A] button / [E] key
+    attack: false   // maps to [B] button / [X] key / Space
 };
 
 const config = {

@@ -139,6 +139,56 @@ class SoundManager {
             osc.stop(t + 1.5);
         });
     }
+
+    // ----------------------------------------------------------
+    // SWING — sawtooth sweep down, like a swipe through air
+    // ----------------------------------------------------------
+    playSwing() {
+        if (!this.ctx) return;
+        const osc  = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+    }
+
+    // ----------------------------------------------------------
+    // HURT — two descending square-wave hits, impact feel
+    // ----------------------------------------------------------
+    playHurt() {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        [330, 220].forEach((freq, i) => {
+            const osc  = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, t + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.06 + 0.15);
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            osc.start(t + i * 0.06); osc.stop(t + i * 0.06 + 0.2);
+        });
+    }
+
+    // ----------------------------------------------------------
+    // ENEMY DIE — descending square wave, defeat squeal
+    // ----------------------------------------------------------
+    playEnemyDie() {
+        if (!this.ctx) return;
+        const osc  = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(60, this.ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+    }
 }
 
 // Global singleton — created here, initialised by TitleScene on first gesture

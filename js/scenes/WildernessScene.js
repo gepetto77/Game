@@ -17,6 +17,15 @@ class WildernessScene extends Phaser.Scene {
         this._artifactCounts = (window.gameState&&window.gameState.artifactCounts)
             ? {...window.gameState.artifactCounts} : {arrowheads:0,pottery:0,tools:0};
         this._localCollected = new Set((window.gameState&&window.gameState.collected)||[]);
+        // Health
+        this._hp      = (window.gameState&&window.gameState.hp    !=null)?window.gameState.hp    :5;
+        this._maxHp   = (window.gameState&&window.gameState.maxHp !=null)?window.gameState.maxHp :5;
+        this._iframes = 0;
+        this._radDmgTimer = 2000;
+        // Combat
+        this._attacking=false; this._attackTimer=0; this._attackCooldown=0;
+        this._attackDir={x:0,y:1}; this._attackWasPressed=false;
+        this._enemies=[];
 
         this.physics.world.setBounds(0,0,W,H);
         const pg=this.make.graphics({x:0,y:0,add:false});
@@ -42,10 +51,16 @@ class WildernessScene extends Phaser.Scene {
         this.cameras.main.fadeIn(700,0,0,0);
         this.physics.add.collider(this.player,this.obstacles);
 
-        this.dialogue=new DialogueBox(this);
+        this.dialogue   =new DialogueBox(this);
+        this._heartsHUD =new HeartsHUD(this,this._maxHp);
+        this._heartsHUD._hp=this._hp; this._heartsHUD._draw();
+        this._attackGfx =this.add.graphics().setDepth(11);
         this._buildInteractables();
         this._createArtifacts();
         this._setupInput();
+        this._radZones=[];
+        const qs=(window.gameState&&window.gameState.questState)||0;
+        if(qs>=QUEST_STATES.INSIDE)this._spawnEnemies();
 
         this.interactHint=this.add.text(0,0,'',{
             fontSize:'9px',fill:'#ffffff',fontFamily:'monospace',
@@ -65,7 +80,8 @@ class WildernessScene extends Phaser.Scene {
         }
     }
 
-    update() {
+    update(time,delta) {
+        const dt=delta||16;
         if(this.dialogue.isVisible()){
             this.player.setVelocity(0,0);
             const down=this.eKey.isDown||window.virtualKeys.action;
@@ -85,8 +101,10 @@ class WildernessScene extends Phaser.Scene {
         if(vx!==0&&vy!==0){vx*=0.707;vy*=0.707;}
         this.player.setVelocity(vx,vy);
 
+        if(vx!==0||vy!==0)this._attackDir={x:vx>0?1:vx<0?-1:0,y:vy>0?1:vy<0?-1:0};
+
         if(vx!==0||vy!==0){
-            this._walkTimer-=16;
+            this._walkTimer-=dt;
             if(this._walkTimer<=0){this._walkTimer=180;this._walkFrame=this._walkFrame===0?1:0;}
             const tex=(vy<0&&vx===0)?'player_back':(this._walkFrame===0?'player_walkA':'player_walkB');
             this.player.setTexture(tex);
@@ -96,9 +114,25 @@ class WildernessScene extends Phaser.Scene {
             this._walkFrame=0; this._walkTimer=0;
         }
         if(vx!==0||vy!==0){
-            this._footstepTimer-=16;
+            this._footstepTimer-=dt;
             if(this._footstepTimer<=0){this._footstepTimer=340;if(window.soundManager&&window.soundManager.ready)window.soundManager.playFootstep();}
         } else {this._footstepTimer=0;}
+
+        // Attack input
+        const atkDown=(this.xKey&&this.xKey.isDown)||(this.spaceKey&&this.spaceKey.isDown)||window.virtualKeys.attack;
+        const col=(window.gameState&&window.gameState.collected)||[];
+        if(atkDown&&!this._attackWasPressed&&this._attackCooldown<=0&&(col.includes('walking_stick')||col.includes('ember_stick'))){
+            this._attackWasPressed=true;this._startAttack();
+        }
+        if(!atkDown)this._attackWasPressed=false;
+        if(this._attackCooldown>0)this._attackCooldown-=dt;
+        if(this._attacking)this._updateAttack(dt);
+
+        // iframes
+        if(this._iframes>0){this._iframes-=dt;this.player.setAlpha(Math.sin(this._iframes*0.025)>0?1:0.3);}
+        else this.player.setAlpha(1);
+
+        this._updateEnemies(dt);
 
         const nearest=this._nearestInteractable();
         if(nearest){
@@ -168,17 +202,83 @@ class WildernessScene extends Phaser.Scene {
         if(!window.gameState)window.gameState={};
         const prev=new Set(window.gameState.collected||[]);
         this._localCollected.forEach(c=>prev.add(c));
-        window.gameState.collected=Array.from(prev);
+        window.gameState.collected  =Array.from(prev);
         window.gameState.artifactCounts={...this._artifactCounts};
+        window.gameState.hp    =this._hp;
+        window.gameState.maxHp =this._maxHp;
     }
 
     _setupInput(){
-        this.cursors=this.input.keyboard.createCursorKeys();
-        this.wasd=this.input.keyboard.addKeys({
-            up:Phaser.Input.Keyboard.KeyCodes.W,down:Phaser.Input.Keyboard.KeyCodes.S,
-            left:Phaser.Input.Keyboard.KeyCodes.A,right:Phaser.Input.Keyboard.KeyCodes.D
+        this.cursors  =this.input.keyboard.createCursorKeys();
+        this.wasd     =this.input.keyboard.addKeys({
+            up:Phaser.Input.Keyboard.KeyCodes.W, down:Phaser.Input.Keyboard.KeyCodes.S,
+            left:Phaser.Input.Keyboard.KeyCodes.A, right:Phaser.Input.Keyboard.KeyCodes.D
         });
-        this.eKey=this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.eKey     =this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.xKey     =this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+        this.spaceKey =this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    }
+
+    // --- Combat ---
+    _startAttack(){
+        if(this._attacking)return;
+        this._attacking=true;this._attackTimer=300;this._attackCooldown=500;
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playSwing();
+    }
+    _updateAttack(delta){
+        this._attackTimer-=delta;
+        const hx=this.player.x+this._attackDir.x*50,hy=this.player.y+this._attackDir.y*50;
+        this._attackGfx.clear();
+        const p=1-(this._attackTimer/300),a=p<0.5?p*2:(1-p)*2;
+        this._attackGfx.fillStyle(0xd4a840,a*0.7);this._attackGfx.fillRect(hx-20,hy-20,40,40);
+        for(const e of this._enemies){
+            if(e.isDead||e._hitThisSwing)continue;
+            if(Phaser.Math.Distance.Between(hx,hy,e.x,e.y)<50){e._hitThisSwing=true;this._hitEnemy(e);}
+        }
+        if(this._attackTimer<=0){
+            this._attacking=false;this._attackGfx.clear();
+            this._enemies.forEach(e=>e._hitThisSwing=false);
+        }
+    }
+    _hitEnemy(e){
+        const col=(window.gameState&&window.gameState.collected)||[];
+        e.hp-=col.includes('ember_stick')?2:1;
+        e.state='STUNNED';e.stunnedTimer=400;
+        if(e.hp<=0)this._killEnemy(e);
+    }
+    _killEnemy(e){
+        e.isDead=true;e.state='DEAD';drawCreature(e);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playEnemyDie();
+        this.time.delayedCall(500,()=>{e._gfx.destroy();e._hpGfx.destroy();});
+    }
+    _spawnEnemies(){
+        [280,520,760].forEach(ex=>this._enemies.push(createCreature(this,'GLOWING_RAT',ex,770)));
+    }
+    _updateEnemies(delta){
+        for(const e of this._enemies){
+            const r=updateCreature(e,this.player.x,this.player.y,delta);
+            drawCreature(e);
+            if(r&&r.dealDamage)this._takeDamage(r.damage);
+        }
+    }
+
+    // --- Health ---
+    _takeDamage(amount){
+        if(this._iframes>0)return;
+        this._hp=Math.max(0,this._hp-amount);
+        this._heartsHUD.setHp(this._hp);this._heartsHUD.flashDamage();
+        this.cameras.main.shake(200,0.008);
+        if(window.soundManager&&window.soundManager.ready)window.soundManager.playHurt();
+        this._iframes=1200;
+        if(this._hp<=0)this._handleDeath();
+    }
+    _handleDeath(){
+        if(this._transitioning)return;
+        this._transitioning=true;
+        this.player.setVelocity(0,0);
+        this._saveState();window.gameState.hp=5;window.gameState.maxHp=5;
+        this.cameras.main.fade(1200,180,0,0);
+        this.time.delayedCall(1400,()=>this.scene.start('GameScene'));
     }
 
     _showWalkingStickHUD(){
@@ -481,19 +581,43 @@ class WildernessScene extends Phaser.Scene {
                   if(c.includes('bolt_cutters')) return 'You found a way in? SICK. Bring me back something radioactive.';
                   return 'Dude. Last night, 2am — green glow by the east fence.\nMy parents said I was dreaming. I wasn\'t dreaming.\nI have a PHOTO. It\'s blurry but still.';
               }},
-            // Mrs. Dottie (ice cream)
+            // Mrs. Dottie (ice cream) — healing item
             { id:'ice_cream', x:1108, y:658, range:68, hintLabel:'Order', speaker:"MRS. DOTTIE",
               getText:(s)=>{
-                  const c=col();
-                  if(c.includes('bolt_cutters'))
-                      return 'Back again? You look like you\'ve been on a mission, sweetheart.\nFudge Avalanche is on me. You\'ve earned it.';
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(c.includes('dottie_healed_2'))return 'You\'ve had enough for one day, sweetheart. Come back tomorrow!';
+                  if(c.includes('dottie_healed'))return 'One more, on the house. You look like you need it.';
+                  if(c.includes('bolt_cutters'))return 'Back again? You look like you\'ve been on a mission, sweetheart.\nFudge Avalanche is on me. You\'ve earned it.';
                   return 'What\'ll it be? Fudge Avalanche, Maple Melt, Campfire Crunch...\nor the Sasquatch Surprise. I can\'t promise what\'s in it.';
+              },
+              onInteract:(s)=>{
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  if(!c.includes('dottie_healed')){
+                      s._localCollected.add('dottie_healed');
+                      window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'dottie_healed'])];
+                      s._hp=Math.min(s._maxHp,s._hp+2);s._heartsHUD.setHp(s._hp);
+                  } else if(!c.includes('dottie_healed_2')){
+                      s._localCollected.add('dottie_healed_2');
+                      window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'dottie_healed_2'])];
+                      s._hp=Math.min(s._maxHp,s._hp+2);s._heartsHUD.setHp(s._hp);
+                  }
               }},
-            // Frank (Willow campsite F) - artifact trading for lore
+            // Frank (Willow campsite F) - artifact trading, lore, ember-stick upgrade
             { id:'frank_campfire', x:290, y:602, range:80, hintLabel:'Approach fire', speaker:'OLD FRANK',
               getText:(s)=>{
                   const n=s._artifactCounts.arrowheads+s._artifactCounts.pottery+s._artifactCounts.tools;
-                  const c=col();
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  const qs=(window.gameState&&window.gameState.questState)||0;
+                  // Ember-stick upgrade (stage 5+, has walking_stick + copper_wire)
+                  if(qs>=QUEST_STATES.FOUND_LOG&&c.includes('walking_stick')&&c.includes('copper_wire')&&!c.includes('ember_stick'))
+                      return 'That stick you\'ve got — your grandfather\'s grain.\nGive me an hour and the wire from the facility.\n*wraps copper tightly around the handle*\nConducts the static charge from the crystal deposits.\nTwo hits now. Maybe three if you swing clean.';
+                  if(c.includes('ember_stick'))
+                      return 'Ember-stick is treating you right?\nCrystal copper combination — old miners\' trick.\nHit straight and it\'ll hold.';
+                  // Survey map (stage 5+, has facility_log)
+                  if(qs>=QUEST_STATES.FOUND_LOG&&c.includes('facility_log')&&!c.includes('survey_map'))
+                      return 'You brought the log back.\nI knew you\'d get in there.\n\n*unrolls something from inside his shelter*\n\nOriginal survey — the lower chambers, sealed section.\nThis is what they didn\'t want people to find.';
+                  if(c.includes('survey_map'))
+                      return 'You have the map now.\nThe lower chamber is marked in red.\nGo back to the cave — there\'s more to find.';
                   if(n===0) return 'Heh. Thought I heard new footsteps.\nNot many find this spot. Name\'s Frank.\nBring me pieces of the past — arrowheads, pottery, old tools.\nI\'ll make it worth your while.';
                   if(n>=10&&!c.includes('frank_lore_3')) return `${n} pieces. You\'ve been listening.\nSit down. I need to tell you about the cave.`;
                   if(n>=6&&!c.includes('frank_lore_2')) return `Six pieces. That\'s respect for the land.\nHere\'s something worth knowing: "Project Emberlight." Write that down.`;
@@ -502,8 +626,25 @@ class WildernessScene extends Phaser.Scene {
               },
               onInteract:(s)=>{
                   const n=s._artifactCounts.arrowheads+s._artifactCounts.pottery+s._artifactCounts.tools;
-                  const c=col();
-                  const add=(id)=>{ s._localCollected.add(id); if(window.gameState){const gs=window.gameState;gs.collected=[...new Set([...(gs.collected||[]),id])];} };
+                  const c=(window.gameState&&window.gameState.collected)||[];
+                  const qs=(window.gameState&&window.gameState.questState)||0;
+                  const add=(id)=>{ s._localCollected.add(id); if(window.gameState){window.gameState.collected=[...new Set([...(window.gameState.collected||[]),id])];} };
+                  const remove=(id)=>{ s._localCollected.delete(id); if(window.gameState){window.gameState.collected=(window.gameState.collected||[]).filter(x=>x!==id);} };
+                  // Ember-stick upgrade
+                  if(qs>=QUEST_STATES.FOUND_LOG&&c.includes('walking_stick')&&c.includes('copper_wire')&&!c.includes('ember_stick')){
+                      remove('walking_stick'); remove('copper_wire'); add('ember_stick');
+                      if(s._stickHUD)s._stickHUD.setText('| ember-stick');
+                      return;
+                  }
+                  // Survey map
+                  if(qs>=QUEST_STATES.FOUND_LOG&&c.includes('facility_log')&&!c.includes('survey_map')){
+                      add('survey_map');
+                      s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',
+                          '*slides a worn folded paper across the log*\n\nOriginal survey — the lower chambers.\nSealed section is marked in red.\nThey built something down there.\nGo back to the cave. Finish this.'));
+                      if(window.gameState)window.gameState.questState=Math.max(window.gameState.questState||0,QUEST_STATES.DEEP_CAVE);
+                      return;
+                  }
+                  // Artifact lore chain
                   if(n>=3&&!c.includes('frank_lore_1')){
                       add('frank_lore_1');
                       s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',
@@ -523,6 +664,25 @@ class WildernessScene extends Phaser.Scene {
 
     _createArtifacts(){
         const col=()=>(window.gameState&&window.gameState.collected)||[];
+        // Berries near creek — instant +1 HP heal
+        if(!col().includes('berries_eaten')){
+            const bx=380,by=780;
+            const bg=this.add.graphics().setDepth(3);
+            bg.fillStyle(0x3a6a18); bg.fillCircle(bx,by,8); bg.fillCircle(bx-5,by-3,6); bg.fillCircle(bx+5,by-3,6);
+            bg.fillStyle(0xcc2244); bg.fillCircle(bx-3,by-2,3); bg.fillCircle(bx+4,by-4,3); bg.fillCircle(bx-1,by+2,2.5);
+            this.interactables.push({
+                id:'berries', x:bx, y:by, range:44, hintLabel:'Pick berries',
+                getText:()=>'Wild berries growing by the creek bank. Probably safe to eat.',
+                onInteract:(s)=>{
+                    s._localCollected.add('berries_eaten');
+                    if(window.gameState)window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'berries_eaten'])];
+                    bg.setVisible(false);
+                    s.interactables.find(o=>o.id==='berries').disabled=true;
+                    s._hp=Math.min(s._maxHp,s._hp+1);s._heartsHUD.setHp(s._hp);
+                    s.dialogue.show('','You ate the wild berries.\n[ +1 HP ]');
+                }
+            });
+        }
         const defs=[
             {id:'arrowhead_creek',  x:280,  y:778, cat:'arrowheads', label:'Arrowhead'},
             {id:'arrowhead_south',  x:860,  y:652, cat:'arrowheads', label:'Arrowhead'},

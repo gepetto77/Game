@@ -9,7 +9,10 @@ const QUEST_STATES = {
     DISCOVERED_CLUE:  1,  // Saw something glowing near the fence
     NEED_TOOL:        2,  // Examined the clue — gate is locked
     HAS_TOOL:         3,  // Picked up the bolt cutters
-    INSIDE:           4   // Entered the restricted area
+    INSIDE:           4,  // Entered the restricted area
+    FOUND_LOG:        5,  // Evidence found — get to Frank with the map
+    DEEP_CAVE:        6,  // Frank's map leads deeper underground
+    EXPOSED:          7   // Transmit the signal — expose Sector 7
 };
 
 // ---- One label per state ------------------------------------
@@ -18,7 +21,10 @@ const QUEST_LABELS = [
     'Investigate the restricted facility east of camp',
     'The gate is padlocked — find bolt cutters',
     'Use the bolt cutters on the facility gate',
-    'Explore the facility grounds'
+    'Explore the facility grounds',
+    'Evidence found — bring it to Frank in the wilderness',
+    "Frank's map leads deeper underground — return to the cave",
+    'Transmit the signal — expose Sector 7'
 ];
 
 class QuestTracker {
