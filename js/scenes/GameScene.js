@@ -55,6 +55,7 @@ class GameScene extends Phaser.Scene {
         this._createBoltCutters();
         this._createExitMarkers();
 
+        createPlayerTextures(this);
         this._createPlayer();
         this.cameras.main.setBounds(0, 0, W, H);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);

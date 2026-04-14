@@ -420,6 +420,7 @@ class LakeScene extends Phaser.Scene {
     }
 
     _createPlayer() {
+        createPlayerTextures(this);
         const gs=window.gameState;
         const sx=(gs&&gs.entryX)||32, sy=(gs&&gs.entryY)||415;
         this.player=this.physics.add.sprite(sx,sy,'player_idle');

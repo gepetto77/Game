@@ -30,6 +30,7 @@ class Sector7Scene extends Phaser.Scene {
         this._buildWalls(W, H);
 
         // Player enters from the cave tunnel below — starts at bottom center
+        createPlayerTextures(this);
         this.player = this.physics.add.sprite(400, 310, 'player_idle');
         this.player.setCollideWorldBounds(true).setDepth(10);
         this.physics.add.collider(this.player, this.obstacles);

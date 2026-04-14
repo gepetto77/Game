@@ -582,6 +582,7 @@ class FacilityScene extends Phaser.Scene {
     }
 
     _createPlayer(){
+        createPlayerTextures(this);
         const gs=window.gameState;
         const sx=(gs&&gs.entryX)||32, sy=(gs&&gs.entryY)||360;
         this.player=this.physics.add.sprite(sx,sy,'player_idle');
