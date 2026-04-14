@@ -543,6 +543,7 @@ class CaveScene extends Phaser.Scene {
     _returnSurface() {
         if (this._returning) return;
         this._returning = true;
+        this._saveState();
         this.cameras.main.fade(1000, 0, 0, 0);
         // Return to Wilderness — cave entrance is at (634, 898) in WildernessScene
         if (window.gameState) { window.gameState.entryX = 634; window.gameState.entryY = 860; }
