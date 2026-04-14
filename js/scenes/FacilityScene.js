@@ -398,10 +398,7 @@ class FacilityScene extends Phaser.Scene {
         pos.forEach(([tx,ty])=>{
             const sz=11+Math.floor(Math.random()*7);
             const g=this.add.graphics().setDepth(6);
-            g.fillStyle(0x1a3a0a,0.35); g.fillCircle(tx+3,ty+sz+4,sz-2);
-            g.fillStyle(0x223a12); g.fillCircle(tx,ty,sz); // sickly darker trees
-            g.fillStyle(0x2a4a18,0.6); g.fillCircle(tx-sz*0.3,ty-sz*0.3,sz*0.55);
-            g.fillStyle(0x4a2a10); g.fillRect(tx-3,ty+sz-4,6,12);
+            drawSicklyTree(g, tx, ty, sz);
         });
     }
 

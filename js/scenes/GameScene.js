@@ -701,10 +701,14 @@ class GameScene extends Phaser.Scene {
         positions.forEach(([tx,ty]) => {
             const sz = 14 + Math.floor(Math.random()*10);
             const g = this.add.graphics().setDepth(6);
-            g.fillStyle(0x1a3a0a,0.4); g.fillCircle(tx+3,ty+sz+4,sz-2);
-            g.fillStyle(0x2a5a18); g.fillCircle(tx,ty,sz);
-            g.fillStyle(0x3a7a22,0.7); g.fillCircle(tx-sz*0.3,ty-sz*0.3,sz*0.55);
-            g.fillStyle(0x4a2a10); g.fillRect(tx-3,ty+sz-4,6,14);
+            drawPineTree(g, tx, ty, sz);
+        });
+
+        // Tree stumps scattered near clusters
+        const stumps = [[230,340],[490,308],[820,375],[140,420],[700,845]];
+        stumps.forEach(([sx,sy]) => {
+            const sg = this.add.graphics().setDepth(4);
+            drawTreeStump(sg, sx, sy, 9);
         });
     }
 
@@ -736,14 +740,12 @@ class GameScene extends Phaser.Scene {
     _createDad() {
         const x = 268, y = 480;
         const g = this.add.graphics().setDepth(8);
-        // Body
-        g.fillStyle(0x4a6a8a); g.fillRect(x-8,y-4,16,20);
-        // Head
-        g.fillStyle(0xd4a870); g.fillCircle(x,y-12,10);
-        // Hat
-        g.fillStyle(0x3a5a2a); g.fillRect(x-10,y-24,20,6); g.fillRect(x-7,y-30,14,8);
-        // Arms
-        g.fillStyle(0xd4a870); g.fillRect(x-16,y-2,8,12); g.fillRect(x+8,y-2,8,12);
+        // Pixel-art NPC base (blue shirt, dark brown hair, slate pants)
+        drawNPC(g, x, y, 0x4a6a8a, 0x3a2810, 0x4a5070);
+        // Ranger hat on top
+        g.fillStyle(0x3a5a2a); g.fillRect(x-9, y-22, 18, 4);
+        g.fillStyle(0x2a4a1a); g.fillRect(x-6, y-28, 12, 8);
+        g.fillStyle(0x3a6a28, 0.5); g.fillRect(x-5, y-27, 10, 2); // hat band highlight
     }
 
     _createSpecialStick() {

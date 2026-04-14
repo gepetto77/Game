@@ -351,12 +351,12 @@ class WildernessScene extends Phaser.Scene {
         this._drawTent(g,cx-38,cy+16,0x3a6a28,0x5a8a40);
         this._drawTable(g,cx+55,cy+18);
         this._drawSiteSign(g,cx-78,cy-28,'C');
-        // Harold NPC sprite
+        // Harold NPC — retired ranger, khaki shirt, grey-brown hair, tan pants
         const np=this.add.graphics().setDepth(8);
         const hx=cx+60,hy=cy+30;
-        np.fillStyle(0x8a6a3a); np.fillRect(hx-7,hy-4,14,18);
-        np.fillStyle(0xc8a060); np.fillCircle(hx,hy-12,9);
-        np.fillStyle(0x4a3a20); np.fillRect(hx-8,hy-22,16,6); np.fillRect(hx-5,hy-28,10,8);
+        drawNPC(np, hx, hy, 0x8a6a3a, 0xb0906a, 0x5a4a30);
+        // Ranger hat
+        np.fillStyle(0x4a3a20); np.fillRect(hx-9,hy-22,18,4); np.fillRect(hx-6,hy-28,12,8);
     }
 
     _createCampsiteCedar(){      // D - Cedar (Mia's site, she's at the lake)
@@ -388,12 +388,10 @@ class WildernessScene extends Phaser.Scene {
         this._drawTable(g,cx-30,cy+26);
         this._drawTable(g,cx+10,cy+26);
         this._drawSiteSign(g,cx+88,cy-22,'E');
-        // Dana NPC
+        // Dana NPC — red shirt, dark hair, blue-grey pants
         const np=this.add.graphics().setDepth(8);
         const dx=cx-40,dy=cy+35;
-        np.fillStyle(0xc84838); np.fillRect(dx-7,dy-4,14,18);
-        np.fillStyle(0xd4a070); np.fillCircle(dx,dy-12,9);
-        np.fillStyle(0xd4a070); np.fillRect(dx-7,dy-4,14,4);
+        drawNPC(np, dx, dy, 0xc84838, 0x2a1808, 0x4a3a6a);
     }
 
     _createCampsiteWillow(){     // F - Frank (wilderness guide)
@@ -407,12 +405,12 @@ class WildernessScene extends Phaser.Scene {
         g.fillStyle(0x2a4a12,0.5); g.fillRect(cx-70,cy-18,50,10);
         this._drawTable(g,cx+40,cy+22);
         this._drawSiteSign(g,cx-92,cy-22,'F');
-        // Frank NPC
+        // Frank NPC — dark earth-tone shirt, warm brown hair, dark pants; wide-brim hat
         const np=this.add.graphics().setDepth(8);
         const fx=cx+10,fy=cy+30;
-        np.fillStyle(0x4a3a20); np.fillRect(fx-7,fy-4,14,18);
-        np.fillStyle(0xb88840); np.fillCircle(fx,fy-12,9);
-        np.fillStyle(0x3a2a10); np.fillRect(fx-9,fy-22,18,6);
+        drawNPC(np, fx, fy, 0x4a3a20, 0xb88840, 0x3a2a10);
+        // Wide-brim bush hat
+        np.fillStyle(0x3a2a10); np.fillRect(fx-10,fy-22,20,4); np.fillRect(fx-6,fy-28,12,8);
         // Campfire embers glow
         const glow=this.add.graphics().setDepth(2);
         glow.fillStyle(0xff6600,0.15); glow.fillCircle(cx+8,cy-18,28);
@@ -511,10 +509,13 @@ class WildernessScene extends Phaser.Scene {
         pos.forEach(([tx,ty])=>{
             const sz=12+Math.floor(Math.random()*10);
             const g=this.add.graphics().setDepth(6);
-            g.fillStyle(0x1a3a0a,0.35); g.fillCircle(tx+3,ty+sz+4,sz-2);
-            g.fillStyle(0x2a5a18); g.fillCircle(tx,ty,sz);
-            g.fillStyle(0x3a7a22,0.65); g.fillCircle(tx-sz*0.3,ty-sz*0.3,sz*0.55);
-            g.fillStyle(0x4a2a10); g.fillRect(tx-3,ty+sz-4,6,12);
+            drawPineTree(g, tx, ty, sz);
+        });
+
+        // Stumps near cave trail and forest edges
+        [[560,860],[625,898],[182,298],[860,310]].forEach(([sx,sy])=>{
+            const sg=this.add.graphics().setDepth(4);
+            drawTreeStump(sg, sx, sy, 8);
         });
     }
 

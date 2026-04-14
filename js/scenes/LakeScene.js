@@ -397,11 +397,15 @@ class LakeScene extends Phaser.Scene {
         pos.forEach(([tx,ty])=>{
             const sz=13+Math.floor(Math.random()*9);
             const g=this.add.graphics().setDepth(6);
-            g.fillStyle(0x1a3a0a,0.35); g.fillCircle(tx+3,ty+sz+4,sz-2);
-            g.fillStyle(0x2a5a18); g.fillCircle(tx,ty,sz);
-            g.fillStyle(0x3a7a22,0.7); g.fillCircle(tx-sz*0.3,ty-sz*0.3,sz*0.55);
-            g.fillStyle(0x4a2a10); g.fillRect(tx-3,ty+sz-4,6,12);
+            drawPineTree(g, tx, ty, sz);
         });
+
+        // Pete the fisherman NPC sitting at the dock end
+        const pg=this.add.graphics().setDepth(8);
+        drawNPC(pg, 654, 398, 0x5a6a4a, 0x8a6030, 0x3a3a50);
+        // Fisherman's cap
+        pg.fillStyle(0x3a3a50); pg.fillRect(654-7, 398-22, 14, 3);
+        pg.fillStyle(0x2a2a40); pg.fillRect(654-5, 398-27, 10, 6);
     }
 
     _createBushes() {
