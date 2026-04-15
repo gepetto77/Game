@@ -79,7 +79,7 @@ class GameScene extends Phaser.Scene {
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ffffff', fontFamily: 'monospace',
             backgroundColor: '#000000bb', padding: { x:5, y:3 }
-        }).setDepth(50).setVisible(false);
+        }).setDepth(50).setVisible(false).setScrollFactor(0);
 
         if (window.gameState) this._loadFromGameState();
     }
@@ -158,7 +158,10 @@ class GameScene extends Phaser.Scene {
         const nearest = this._nearestInteractable();
         if (nearest) {
             this.interactHint.setText('[ E ] ' + (nearest.hintLabel || 'Examine'));
-            this.interactHint.setPosition(nearest.x - this.interactHint.width / 2, nearest.y - 42);
+            const _cam = this.cameras.main;
+            const _sx = (nearest.x - _cam.scrollX) * _cam.zoom;
+            const _sy = (nearest.y - _cam.scrollY) * _cam.zoom;
+            this.interactHint.setPosition(_sx - this.interactHint.width / 2, _sy - 42);
             this.interactHint.setVisible(true);
         } else { this.interactHint.setVisible(false); }
 

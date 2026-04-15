@@ -48,7 +48,7 @@ class Sector7Scene extends Phaser.Scene {
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ffcccc', fontFamily: 'monospace',
             backgroundColor: '#000000cc', padding: { x: 5, y: 3 }
-        }).setDepth(50).setVisible(false);
+        }).setDepth(50).setVisible(false).setScrollFactor(0);
 
         this._buildInteractables();
         this._drawTransmitter();
@@ -137,7 +137,10 @@ class Sector7Scene extends Phaser.Scene {
         const near = this._nearest();
         if (near) {
             this.interactHint.setText('[ E ]  ' + near.label);
-            this.interactHint.setPosition(near.x - this.interactHint.width / 2, near.y - 44);
+            const _cam=this.cameras.main;
+            const _sx=(near.x-_cam.scrollX)*_cam.zoom;
+            const _sy=(near.y-_cam.scrollY)*_cam.zoom;
+            this.interactHint.setPosition(_sx-this.interactHint.width/2,_sy-44);
             this.interactHint.setVisible(true);
         } else { this.interactHint.setVisible(false); }
 
