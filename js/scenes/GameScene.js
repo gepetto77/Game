@@ -8,6 +8,8 @@
 class GameScene extends Phaser.Scene {
     constructor() { super({ key: 'GameScene' }); }
 
+    preload() { preloadSprites(this); }
+
     create() {
         const W = 1200, H = 900;
         this.WORLD_W = W; this.WORLD_H = H;
@@ -55,6 +57,7 @@ class GameScene extends Phaser.Scene {
         this._createBoltCutters();
         this._createExitMarkers();
 
+        initSpriteFrames(this);
         createPlayerTextures(this);
         this._createPlayer();
         this.cameras.main.setBounds(0, 0, W, H);
@@ -116,16 +119,7 @@ class GameScene extends Phaser.Scene {
             };
         }
 
-        if (vx !== 0 || vy !== 0) {
-            this._walkTimer -= dt;
-            if (this._walkTimer <= 0) { this._walkTimer = 180; this._walkFrame = this._walkFrame === 0 ? 1 : 0; }
-            const tex = (vy < 0 && vx === 0) ? 'player_back' : (this._walkFrame === 0 ? 'player_walkA' : 'player_walkB');
-            this.player.setTexture(tex);
-            if (vx < 0) this.player.setFlipX(true); else if (vx > 0) this.player.setFlipX(false);
-        } else {
-            this.player.setTexture('player_idle');
-            this._walkFrame = 0; this._walkTimer = 0;
-        }
+        updatePlayerAnim(this, vx, vy, dt);
 
         if (vx !== 0 || vy !== 0) {
             this._footstepTimer -= dt;
@@ -753,8 +747,7 @@ class GameScene extends Phaser.Scene {
         ];
         positions.forEach(([tx,ty]) => {
             const sz = 14 + Math.floor(Math.random()*10);
-            const g = this.add.graphics().setDepth(6);
-            drawPineTree(g, tx, ty, sz);
+            placePineTree(this, tx, ty, sz, 6);
         });
 
         // Tree stumps scattered near clusters
@@ -834,7 +827,7 @@ class GameScene extends Phaser.Scene {
         const startX = (window.gameState && window.gameState.entryX) ? window.gameState.entryX : 490;
         const startY = (window.gameState && window.gameState.entryY) ? window.gameState.entryY : 310;
         if (window.gameState) { delete window.gameState.entryX; delete window.gameState.entryY; }
-        this.player = this.physics.add.sprite(startX, startY, 'player_idle');
+        this.player = createPlayerSprite(this, startX, startY);
         this.player.setCollideWorldBounds(true).setDepth(10);
     }
 

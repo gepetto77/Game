@@ -6,6 +6,8 @@
 class LakeScene extends Phaser.Scene {
     constructor() { super({ key: 'LakeScene' }); }
 
+    preload() { preloadSprites(this); }
+
     create() {
         const W = 960, H = 640;
         this.WORLD_W = W; this.WORLD_H = H;
@@ -41,6 +43,7 @@ class LakeScene extends Phaser.Scene {
         this._createBushes();
         this._createExitMarker();
 
+        initSpriteFrames(this);
         this._createPlayer();
         this.cameras.main.setBounds(0, 0, W, H);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -109,16 +112,7 @@ class LakeScene extends Phaser.Scene {
 
         if(vx!==0||vy!==0) this._attackDir={x:vx>0?1:vx<0?-1:0,y:vy>0?1:vy<0?-1:0};
 
-        if(vx!==0||vy!==0){
-            this._walkTimer-=dt;
-            if(this._walkTimer<=0){this._walkTimer=180;this._walkFrame=this._walkFrame===0?1:0;}
-            const tex=(vy<0&&vx===0)?'player_back':(this._walkFrame===0?'player_walkA':'player_walkB');
-            this.player.setTexture(tex);
-            if(vx<0)this.player.setFlipX(true); else if(vx>0)this.player.setFlipX(false);
-        } else {
-            this.player.setTexture('player_idle');
-            this._walkFrame=0; this._walkTimer=0;
-        }
+        updatePlayerAnim(this, vx, vy, dt);
         if(vx!==0||vy!==0){
             this._footstepTimer-=dt;
             if(this._footstepTimer<=0){this._footstepTimer=340;if(window.soundManager&&window.soundManager.ready)window.soundManager.playFootstep();}
@@ -400,8 +394,7 @@ class LakeScene extends Phaser.Scene {
                    [20,530],[60,550],[100,520],[150,560],[20,620],[70,610]];
         pos.forEach(([tx,ty])=>{
             const sz=13+Math.floor(Math.random()*9);
-            const g=this.add.graphics().setDepth(6);
-            drawPineTree(g, tx, ty, sz);
+            placePineTree(this, tx, ty, sz, 6);
         });
 
         // Pete the fisherman NPC sitting at the dock end
@@ -431,7 +424,7 @@ class LakeScene extends Phaser.Scene {
         createPlayerTextures(this);
         const gs=window.gameState;
         const sx=(gs&&gs.entryX)||32, sy=(gs&&gs.entryY)||415;
-        this.player=this.physics.add.sprite(sx,sy,'player_idle');
+        this.player=createPlayerSprite(this, sx, sy);
         this.player.setCollideWorldBounds(true).setDepth(10);
     }
 

@@ -9,6 +9,8 @@ class Sector7Scene extends Phaser.Scene {
 
     constructor() { super({ key: 'Sector7Scene' }); }
 
+    preload() { preloadSprites(this); }
+
     create() {
         const W = 800, H = 360;
         this.physics.world.setBounds(0, 0, W, H);
@@ -30,8 +32,9 @@ class Sector7Scene extends Phaser.Scene {
         this._buildWalls(W, H);
 
         // Player enters from the cave tunnel below — starts at bottom center
+        initSpriteFrames(this);
         createPlayerTextures(this);
-        this.player = this.physics.add.sprite(400, 310, 'player_idle');
+        this.player = createPlayerSprite(this, 400, 310);
         this.player.setCollideWorldBounds(true).setDepth(10);
         this.physics.add.collider(this.player, this.obstacles);
 
@@ -106,18 +109,7 @@ class Sector7Scene extends Phaser.Scene {
         this.player.setVelocity(vx, vy);
 
         // Walk animation
-        if (vx || vy) {
-            this._walkTimer -= dt;
-            if (this._walkTimer <= 0) { this._walkTimer = 180; this._walkFrame ^= 1; }
-            const tex = (vy < 0 && !vx) ? 'player_back'
-                : (this._walkFrame ? 'player_walkA' : 'player_walkB');
-            this.player.setTexture(tex);
-            if (vx < 0) this.player.setFlipX(true);
-            else if (vx > 0) this.player.setFlipX(false);
-        } else {
-            this.player.setTexture('player_idle');
-            this._walkFrame = 0; this._walkTimer = 0;
-        }
+        updatePlayerAnim(this, vx, vy, dt);
 
         // iframes flash
         if (this._iframes > 0) { this._iframes -= dt; this.player.setAlpha(Math.sin(this._iframes * 0.025) > 0 ? 1 : 0.3); }

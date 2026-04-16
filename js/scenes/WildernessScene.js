@@ -8,6 +8,8 @@
 class WildernessScene extends Phaser.Scene {
     constructor() { super({ key: 'WildernessScene' }); }
 
+    preload() { preloadSprites(this); }
+
     create() {
         const W = 1280, H = 960;
         this.WORLD_W = W; this.WORLD_H = H;
@@ -45,6 +47,7 @@ class WildernessScene extends Phaser.Scene {
         this._createBushes();
         this._createExitMarker();
 
+        initSpriteFrames(this);
         this._createPlayer();
         this.cameras.main.setBounds(0,0,W,H);
         this.cameras.main.startFollow(this.player,true,0.1,0.1);
@@ -109,15 +112,8 @@ class WildernessScene extends Phaser.Scene {
 
         if(vx!==0||vy!==0)this._attackDir={x:vx>0?1:vx<0?-1:0,y:vy>0?1:vy<0?-1:0};
 
-        if(vx!==0||vy!==0){
-            this._walkTimer-=dt;
-            if(this._walkTimer<=0){this._walkTimer=180;this._walkFrame=this._walkFrame===0?1:0;}
-            const tex=(vy<0&&vx===0)?'player_back':(this._walkFrame===0?'player_walkA':'player_walkB');
-            this.player.setTexture(tex);
-            if(vx<0)this.player.setFlipX(true); else if(vx>0)this.player.setFlipX(false);
-        } else {
-            this.player.setTexture('player_idle');
-            this._walkFrame=0; this._walkTimer=0;
+        updatePlayerAnim(this, vx, vy, dt);
+        if (false) { // legacy block kept for structure reference
         }
         if(vx!==0||vy!==0){
             this._footstepTimer-=dt;
@@ -574,8 +570,7 @@ class WildernessScene extends Phaser.Scene {
         ];
         pos.forEach(([tx,ty])=>{
             const sz=12+Math.floor(Math.random()*10);
-            const g=this.add.graphics().setDepth(6);
-            drawPineTree(g, tx, ty, sz);
+            placePineTree(this, tx, ty, sz, 6);
         });
 
         // Stumps near cave trail and forest edges
@@ -609,7 +604,7 @@ class WildernessScene extends Phaser.Scene {
         createPlayerTextures(this);
         const gs=window.gameState;
         const sx=(gs&&gs.entryX)||640, sy=(gs&&gs.entryY)||32;
-        this.player=this.physics.add.sprite(sx,sy,'player_idle');
+        this.player=createPlayerSprite(this, sx, sy);
         this.player.setCollideWorldBounds(true).setDepth(10);
     }
 
