@@ -14,6 +14,7 @@ class CaveScene extends Phaser.Scene {
     create() {
         const W = 800, H = 560;
         this.physics.world.setBounds(0, 0, W, H);
+        initSpriteFrames(this);
 
         this._actionWasPressed = false;
         this._walkFrame  = 0;
@@ -39,7 +40,6 @@ class CaveScene extends Phaser.Scene {
         this._buildWalls(W, H);
 
         // ---- Player ----
-        initSpriteFrames(this);
         createPlayerTextures(this);
         this.player = createPlayerSprite(this, 400, 450);
         this.player.setCollideWorldBounds(true).setDepth(10);

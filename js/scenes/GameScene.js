@@ -36,6 +36,7 @@ class GameScene extends Phaser.Scene {
         this._attackWasPressed = false;
 
         this.physics.world.setBounds(0, 0, W, H);
+        initSpriteFrames(this);
         const pg = this.make.graphics({ x:0, y:0, add:false });
         pg.fillStyle(0xffffff,1); pg.fillRect(0,0,1,1);
         pg.generateTexture('pixel',1,1); pg.destroy();
@@ -57,7 +58,6 @@ class GameScene extends Phaser.Scene {
         this._createBoltCutters();
         this._createExitMarkers();
 
-        initSpriteFrames(this);
         createPlayerTextures(this);
         this._createPlayer();
         this.cameras.main.setBounds(0, 0, W, H);

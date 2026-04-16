@@ -32,6 +32,7 @@ class FacilityScene extends Phaser.Scene {
         this._enemies=[];
 
         this.physics.world.setBounds(0,0,W,H);
+        initSpriteFrames(this);
         const pg=this.make.graphics({x:0,y:0,add:false});
         pg.fillStyle(0xffffff,1); pg.fillRect(0,0,1,1);
         pg.generateTexture('pixel',1,1); pg.destroy();
@@ -45,7 +46,6 @@ class FacilityScene extends Phaser.Scene {
         this._createWorkerBadge();
         this._createControlPanel();
 
-        initSpriteFrames(this);
         this._createPlayer();
         this.cameras.main.setBounds(0,0,W,H);
         this.cameras.main.startFollow(this.player,true,0.1,0.1);
