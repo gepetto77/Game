@@ -91,9 +91,15 @@ class GameScene extends Phaser.Scene {
         }).setDepth(50).setVisible(false).setScrollFactor(0);
 
         if (window.gameState) this._loadFromGameState();
+
+        if (!this.collected.has('seen_controls_hint')) {
+            this.collected.add('seen_controls_hint');
+            this._showControlsHint();
+        }
     }
 
     update(time, delta) {
+        fixUICameraZoom(this);
         const dt = delta || 16;
         // Inventory panel toggle
         const iDown = this.iKey && this.iKey.isDown;
@@ -984,6 +990,21 @@ class GameScene extends Phaser.Scene {
             onInteract: (s) => { s._cornhole.open((score) => {
                 if (score != null) { s.collected.add('played_cornhole'); s._saveGameState(); }
             }); }
+        });
+    }
+
+    _showControlsHint() {
+        const hint = this.add.text(240, 50,
+            '[▲▼◀▶ / WASD] Move    [E] Interact    [I] Inventory',
+            {
+                fontSize: '8px', fill: '#ffffff', fontFamily: 'monospace',
+                backgroundColor: '#000000aa', padding: { x: 8, y: 5 }
+            }
+        ).setScrollFactor(0).setDepth(96).setOrigin(0.5, 0);
+        this.tweens.add({
+            targets: hint, alpha: { from: 1, to: 0 },
+            delay: 4500, duration: 1200,
+            onComplete: () => hint.destroy()
         });
     }
 

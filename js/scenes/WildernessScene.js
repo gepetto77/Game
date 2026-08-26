@@ -60,6 +60,7 @@ class WildernessScene extends Phaser.Scene {
         this._heartsHUD._hp=this._hp; this._heartsHUD._draw();
         this._attackGfx =this.add.graphics().setDepth(11);
         this._invPanel  =new InventoryPanel(this); this._invWasPressed=false;
+        this._objective =new ObjectiveBar(this);
         this._frisbee   =new FrisbeeMinigame(this);
         this._buildInteractables();
         this._createArtifacts();
@@ -88,6 +89,7 @@ class WildernessScene extends Phaser.Scene {
     }
 
     update(time,delta) {
+        fixUICameraZoom(this);
         const dt=delta||16;
         const iDown=this.iKey&&this.iKey.isDown;
         if(iDown&&!this._invWasPressed){this._invWasPressed=true;this._invPanel.toggle();}
@@ -162,6 +164,7 @@ class WildernessScene extends Phaser.Scene {
             }
         }
         if(!down)this._actionWasPressed=false;
+        this._objective.refresh();
         this._checkExits();
     }
 

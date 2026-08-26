@@ -57,6 +57,7 @@ class CaveScene extends Phaser.Scene {
         this._heartsHUD._hp = this._hp; this._heartsHUD._draw();
         this._attackGfx = this.add.graphics().setDepth(11);
         this._invPanel  = new InventoryPanel(this); this._invWasPressed = false;
+        this._objective = new ObjectiveBar(this);
 
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ccffcc', fontFamily: 'monospace',
@@ -96,6 +97,7 @@ class CaveScene extends Phaser.Scene {
 
     // ----------------------------------------------------------
     update(time, delta) {
+        fixUICameraZoom(this);
         const dt = delta || 16;
         const iDown = this.iKey && this.iKey.isDown;
         if (iDown && !this._invWasPressed) { this._invWasPressed = true; this._invPanel.toggle(); }
@@ -188,6 +190,8 @@ class CaveScene extends Phaser.Scene {
             if (near) this._interact(near);
         }
         if (!down) this._actionWasPressed = false;
+
+        this._objective.refresh();
 
         // Exit trigger — bottom of entry shaft
         if (!this._returning && this.player.y > 496 && this.player.x > 348 && this.player.x < 452) {

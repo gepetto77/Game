@@ -7,15 +7,7 @@
 
 const _SPRITE_BASE = 'js/sprites/';
 
-// Scale applied to player_sheet sprites to match ~24px world height
-const PLAYER_SCALE = 0.125;
-
 function preloadSprites(scene) {
-    if (!scene.textures.exists('player_sheet')) {
-        scene.load.spritesheet('player_sheet',
-            _SPRITE_BASE + 'Main_Charachter_Assets_alpha.png',
-            { frameWidth: 256, frameHeight: 256 });
-    }
     if (!scene.textures.exists('campground')) {
         scene.load.image('campground', _SPRITE_BASE + 'Campground_Assets_alpha.png');
     }
@@ -23,9 +15,6 @@ function preloadSprites(scene) {
         scene.load.image('cave_sheet', _SPRITE_BASE + 'Cave_Asseets_alpha.png');
     }
 }
-
-let _framesInited = false;
-let _animsInited  = false;
 
 function initSpriteFrames(scene) {
     // ---- Campground atlas ----
@@ -80,25 +69,6 @@ function initSpriteFrames(scene) {
         }
     }
 
-    // ---- Player animations (global, created once) ----
-    if (!_animsInited && scene.textures.exists('player_sheet')) {
-        _animsInited = true;
-        scene.anims.create({
-            key: 'walk_down',
-            frames: scene.anims.generateFrameNumbers('player_sheet', { start: 0, end: 5 }),
-            frameRate: 8, repeat: -1
-        });
-        scene.anims.create({
-            key: 'walk_up',
-            frames: scene.anims.generateFrameNumbers('player_sheet', { start: 12, end: 17 }),
-            frameRate: 8, repeat: -1
-        });
-        scene.anims.create({
-            key: 'walk_side',
-            frames: scene.anims.generateFrameNumbers('player_sheet', { start: 18, end: 23 }),
-            frameRate: 8, repeat: -1
-        });
-    }
 }
 
 // ------------------------------------------------------------------
@@ -139,45 +109,28 @@ function updatePlayerAnim(scene, vx, vy, dt) {
     const p = scene.player;
     if (!p) return;
 
-    if (scene.textures.exists('player_sheet')) {
-        if (vx !== 0 || vy !== 0) {
-            const anim = (vy < 0 && vx === 0) ? 'walk_up'
-                       : (vx !== 0)            ? 'walk_side'
-                                               : 'walk_down';
-            if (p.anims.getName() !== anim) p.play(anim);
-        } else {
-            p.stop(); p.setFrame(0);
+    if (vx !== 0 || vy !== 0) {
+        scene._walkTimer = (scene._walkTimer || 0) - dt;
+        if (scene._walkTimer <= 0) {
+            scene._walkTimer = 180;
+            scene._walkFrame = scene._walkFrame === 0 ? 1 : 0;
         }
+        const tex = (vy < 0 && vx === 0) ? 'player_back'
+                  : (scene._walkFrame === 0 ? 'player_walkA' : 'player_walkB');
+        p.setTexture(tex);
         if (vx < 0) p.setFlipX(true); else if (vx > 0) p.setFlipX(false);
     } else {
-        // Legacy canvas-texture fallback
-        if (vx !== 0 || vy !== 0) {
-            scene._walkTimer = (scene._walkTimer || 0) - dt;
-            if (scene._walkTimer <= 0) {
-                scene._walkTimer = 180;
-                scene._walkFrame = scene._walkFrame === 0 ? 1 : 0;
-            }
-            const tex = (vy < 0 && vx === 0) ? 'player_back'
-                      : (scene._walkFrame === 0 ? 'player_walkA' : 'player_walkB');
-            p.setTexture(tex);
-            if (vx < 0) p.setFlipX(true); else if (vx > 0) p.setFlipX(false);
-        } else {
-            p.setTexture('player_idle');
-            scene._walkFrame = 0; scene._walkTimer = 0;
-        }
+        p.setTexture('player_idle');
+        scene._walkFrame = 0; scene._walkTimer = 0;
     }
 }
 
 // ------------------------------------------------------------------
-// Helper: create player physics sprite using sheet when available.
+// Helper: create the player's physics sprite. Uses the small
+// procedurally-drawn (16x24) texture from PlayerSprites.js so the
+// player matches the same simple-shapes style as everything else
+// and keeps a collision body sized to match what's on screen.
 // ------------------------------------------------------------------
 function createPlayerSprite(scene, x, y) {
-    let player;
-    if (scene.textures.exists('player_sheet')) {
-        player = scene.physics.add.sprite(x, y, 'player_sheet', 0);
-        player.setScale(PLAYER_SCALE).setOrigin(0.5, 0.85);
-    } else {
-        player = scene.physics.add.sprite(x, y, 'player_idle');
-    }
-    return player;
+    return scene.physics.add.sprite(x, y, 'player_idle');
 }
