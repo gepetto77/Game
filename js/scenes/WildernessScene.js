@@ -689,7 +689,7 @@ class WildernessScene extends Phaser.Scene {
                   if(c.includes('survey_map'))
                       return 'You have the map now.\nThe lower chamber is marked in red.\nGo back to the cave — there\'s more to find.';
                   if(n===0) return 'Heh. Thought I heard new footsteps.\nNot many find this spot. Name\'s Frank.\nYou\'ll turn up old things out here — arrowheads, bits of pottery, tools.\nBring \'em by and let me take a look.\nI keep a journal on everything that\'s ever turned up in these woods.\nYou hang on to what you find — I just like to know about it.';
-                  if(n>=9&&!c.includes('frank_lore_3')) return `${n} finds in the book now. You\'ve been paying attention.\nSit down. I need to tell you about the cave.`;
+                  if(n>=10&&!c.includes('frank_lore_3')) return `${n} finds in the book now. You\'ve been paying attention.\nSit down. I need to tell you about the cave.`;
                   if(n>=6&&!c.includes('frank_lore_2')) return `Six finds, six pages. That\'s respect for the land.\nHere\'s something worth writing down yourself: "Project Emberlight."`;
                   if(n>=3&&!c.includes('frank_lore_1')) return `Three finds already, and a good eye for where to look.\nI\'ll tell you about the cave. You\'ve earned that much.`;
                   return `${n} find${n>1?'s':''} in the journal so far.\nThree, and I\'ve got a story for you.`;
@@ -723,7 +723,7 @@ class WildernessScene extends Phaser.Scene {
                       add('frank_lore_2');
                       s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',
                           '*adds another page to the journal*\n\n"Project Emberlight." Energy research, officially.\nBut the emissions I was seeing...\nThat wasn\'t standard physics.\nI walked away. Should\'ve spoken up.'));
-                  } else if(n>=9&&!c.includes('frank_lore_3')){
+                  } else if(n>=10&&!c.includes('frank_lore_3')){
                       add('frank_lore_3');
                       s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',
                           'There\'s a lower chamber in that cave. Sealed from the inside.\nI think you already know what\'s down there.\n\n*slides something across the log*\n\nOriginal survey map. Don\'t lose it.'));
