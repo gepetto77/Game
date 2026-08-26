@@ -862,7 +862,7 @@ class GameScene extends Phaser.Scene {
             this[`_agfx_${d.id}`] = g; this[`_aglow_${d.id}`] = glow;
             this.interactables.push({
                 id:d.id, x:d.x, y:d.y, range:44, hintLabel:'Pick up',
-                text:`You found a ${d.label}. It's old — maybe Frank would know more.`,
+                text:`You found a ${d.label}. Worth showing Frank — he keeps a journal on finds like this.`,
                 onInteract:(s) => {
                     s.collected.add(d.id);
                     s._artifactCounts[d.cat]++;
