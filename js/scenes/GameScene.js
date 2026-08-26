@@ -74,9 +74,14 @@ class GameScene extends Phaser.Scene {
         this._attackGfx  = this.add.graphics().setDepth(11);
         this._invPanel   = new InventoryPanel(this);
         this._invWasPressed = false;
+        this._campfireMinigame = new CampfireMinigame(this);
+        this._cornhole         = new CornholeMinigame(this);
+        this._firewoodTurnedIn = false;
 
         this._buildInteractables();
         this._createArtifacts();
+        this._createFirewoodPiles();
+        this._createCornhole();
         this._setupInput();
 
         this.interactHint = this.add.text(0, 0, '', {
@@ -94,6 +99,8 @@ class GameScene extends Phaser.Scene {
         if (iDown && !this._invWasPressed) { this._invWasPressed = true; this._invPanel.toggle(); }
         if (!iDown) this._invWasPressed = false;
         if (this._invPanel.isOpen()) { this.player.setVelocity(0, 0); return; }
+        if (this._campfireMinigame.isOpen()) { this.player.setVelocity(0, 0); this._campfireMinigame.update(); return; }
+        if (this._cornhole.isOpen()) { this.player.setVelocity(0, 0); this._cornhole.update(dt); return; }
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0, 0);
             this._handleActionPress(() => this.dialogue.tryDismiss());
@@ -363,9 +370,17 @@ class GameScene extends Phaser.Scene {
                       return 'Treat that stick well.\nYour grandfather had one just like it.';
                   if (s.collected.has('stick_raw'))
                       return 'Hey — let me see that one.\n...\nGood piece of wood. Give me a few minutes.';
+                  if (s._firewoodTurnedIn)
+                      return "Fire's going good, thanks to you.\nGo grab a seat by it.";
+                  const n = s._firewoodCount();
+                  if (n >= 5)
+                      return "Looks like you've got a good armful there.\nBring it on over and let's get this fire going.";
+                  if (n > 0)
+                      return `Good start. Need ${5 - n} more good sticks for the fire.\nTry the north trail.`;
                   return 'Hey explorer!\nListen — grab me some good sticks for the fire?\nWander toward the north trail.';
               },
               onInteract:(s) => {
+                  if (!s._firewoodTurnedIn && s._firewoodCount() >= 5) { s._turnInFirewood(); return; }
                   if (s.collected.has('stick_raw') && !s.collected.has('walking_stick')) {
                       s.time.delayedCall(400, () => {
                           s.dialogue.show('DAD',
@@ -860,6 +875,106 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    // ----------------------------------------------------------
+    // FIREWOOD QUEST — ordinary sticks for Dad's campfire.
+    // Separate from the special gnarled branch (walking stick).
+    // ----------------------------------------------------------
+    _createFirewoodPiles() {
+        const defs = [
+            { id:'firewood_0', x:230, y:130 },
+            { id:'firewood_1', x:640, y:130 },
+            { id:'firewood_2', x:820, y:190 },
+            { id:'firewood_3', x:150, y:250 },
+            { id:'firewood_4', x:950, y:90  },
+        ];
+        defs.forEach(d => {
+            if (this.collected.has(d.id)) return;
+            const g = this.add.graphics().setDepth(3);
+            g.lineStyle(3, 0x6b4522);
+            g.lineBetween(d.x-8, d.y+4, d.x+8, d.y-4);
+            g.lineBetween(d.x-7, d.y-3, d.x+7, d.y+5);
+            g.lineBetween(d.x-2, d.y+6, d.x+3, d.y-7);
+            const glow = this.add.graphics().setDepth(2);
+            glow.fillStyle(0xffdd88, 0.14); glow.fillCircle(d.x, d.y, 12);
+            this.tweens.add({targets:glow, alpha:{from:0.14,to:0.04}, yoyo:true, repeat:-1, duration:1500+Math.random()*300});
+            this[`_agfx_${d.id}`] = g; this[`_aglow_${d.id}`] = glow;
+            this.interactables.push({
+                id: d.id, x: d.x, y: d.y, range: 44, hintLabel: 'Pick up',
+                text: 'A good dry stick for the fire.',
+                onInteract: (s) => {
+                    s.collected.add(d.id);
+                    s[`_agfx_${d.id}`].setVisible(false);
+                    s[`_aglow_${d.id}`].setVisible(false);
+                    s.interactables.find(o => o.id === d.id).disabled = true;
+                    s._updateFirewoodHUD();
+                    s._saveGameState();
+                }
+            });
+        });
+    }
+
+    _firewoodCount() {
+        return Array.from(this.collected).filter(k => k.startsWith('firewood_')).length;
+    }
+
+    _updateFirewoodHUD() {
+        const n = this._firewoodCount();
+        if (this._firewoodTurnedIn || n <= 0) {
+            if (this._firewoodHUD) { this._firewoodHUD.destroy(); this._firewoodHUD = null; }
+            return;
+        }
+        const label = `| wood ${n}/5`;
+        if (!this._firewoodHUD) {
+            this._firewoodHUD = this.add.text(474, 44, label, {
+                fontSize:'8px', fill:'#c88a44', fontFamily:'monospace'
+            }).setScrollFactor(0).setDepth(95).setOrigin(1,0);
+        } else {
+            this._firewoodHUD.setText(label);
+        }
+    }
+
+    _turnInFirewood() {
+        if (this._firewoodTurnedIn) return;
+        for (let i = 0; i < 5; i++) this.collected.delete('firewood_' + i);
+        this._firewoodTurnedIn = true;
+        this._updateFirewoodHUD();
+        this._saveGameState();
+        this.dialogue.show('DAD', "Perfect. That'll do it.\nLet's get this fire going right.", () => {
+            this._campfireMinigame.open(() => {
+                this.collected.add('campfire_built');
+                this._saveGameState();
+                this.dialogue.show('DAD', 'Nice work. Nothing like a good fire.\nGo grab a seat — dinner\'s almost ready.');
+            });
+        });
+    }
+
+    // ----------------------------------------------------------
+    // CORNHOLE — optional camp activity, replayable.
+    // ----------------------------------------------------------
+    _createCornhole() {
+        const x = 610, y = 500;
+        const g = this.add.graphics().setDepth(4);
+        const drawBoard = (bx, flip) => {
+            g.fillStyle(0x8a6a3a);
+            g.fillRect(bx-2, y+10, 4, 14);
+            g.fillStyle(0x7a5a2e);
+            g.fillTriangle(bx-22, y+12, bx+22, y+12, bx, y-16);
+            g.fillStyle(0x3a2a10);
+            g.fillCircle(bx, y-2, 5);
+        };
+        drawBoard(x-30, 1);
+        drawBoard(x+30, -1);
+        this.add.text(x, y+26, 'CORNHOLE', {fontSize:'6px', fill:'#c8a870', fontFamily:'monospace'}).setDepth(5).setOrigin(0.5);
+
+        this.interactables.push({
+            id: 'cornhole_boards', x, y, range: 60, hintLabel: 'Play cornhole', speaker: '',
+            text: 'Toss a few bags?',
+            onInteract: (s) => { s._cornhole.open((score) => {
+                if (score != null) { s.collected.add('played_cornhole'); s._saveGameState(); }
+            }); }
+        });
+    }
+
     _showWalkingStickHUD() {
         if (this._stickHUD) return;
         this._stickHUD = this.add.text(474, 22, '| stick', {
@@ -886,16 +1001,19 @@ class GameScene extends Phaser.Scene {
             endingPlayed:   this._endingPlayed,
             hp:             this._hp,
             maxHp:          this._maxHp,
+            firewoodTurnedIn: this._firewoodTurnedIn || false,
         };
         SaveManager.save(window.gameState);
     }
 
     _loadFromGameState() {
         const gs = window.gameState; if (!gs) return;
-        this.collected       = new Set(gs.collected || []);
-        this._artifactCounts = { ...(gs.artifactCounts || {arrowheads:0,pottery:0,tools:0}) };
-        this._gateOpen       = gs.gateOpen || false;
-        this._endingPlayed   = gs.endingPlayed || false;
+        this.collected        = new Set(gs.collected || []);
+        this._artifactCounts  = { ...(gs.artifactCounts || {arrowheads:0,pottery:0,tools:0}) };
+        this._gateOpen        = gs.gateOpen || false;
+        this._endingPlayed    = gs.endingPlayed || false;
+        this._firewoodTurnedIn = gs.firewoodTurnedIn || false;
+        this._updateFirewoodHUD();
 
         if (gs.questState > 0) {
             this.quest.state = gs.questState;
