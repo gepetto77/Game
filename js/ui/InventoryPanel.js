@@ -105,6 +105,7 @@ class InventoryPanel {
         const maxHp = gs.maxHp != null ? gs.maxHp : 5;
         const ac  = gs.artifactCounts || {arrowheads:0,pottery:0,tools:0};
         const arts = (ac.arrowheads||0) + (ac.pottery||0) + (ac.tools||0);
+        const fishCount = (gs.fishLog||[]).length;
 
         // Quest section
         const stage = `Stage ${qs + 1}/8`;
@@ -129,7 +130,7 @@ class InventoryPanel {
 
         // Footer: HP hearts + artifacts
         const hearts = '\u2665'.repeat(hp) + '\u2661'.repeat(Math.max(0, maxHp - hp));
-        const footerStr = `HP: ${hearts}    Artifacts: ${arts}    [ I ] to close`;
+        const footerStr = `HP: ${hearts}    Artifacts: ${arts}    Fish: ${fishCount}/4    [ I ] to close`;
         this._footerText.setText(footerStr);
     }
 }

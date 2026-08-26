@@ -47,6 +47,7 @@ class Sector7Scene extends Phaser.Scene {
         this._heartsHUD = new HeartsHUD(this, this._maxHp);
         this._heartsHUD._hp = this._hp; this._heartsHUD._draw();
         this._invPanel  = new InventoryPanel(this); this._invWasPressed = false;
+        this._objective = new ObjectiveBar(this);
 
         this.interactHint = this.add.text(0, 0, '', {
             fontSize: '9px', fill: '#ffcccc', fontFamily: 'monospace',
@@ -83,6 +84,7 @@ class Sector7Scene extends Phaser.Scene {
 
     // ----------------------------------------------------------
     update(time, delta) {
+        fixUICameraZoom(this);
         const dt = delta || 16;
         const iDown = this.iKey && this.iKey.isDown;
         if (iDown && !this._invWasPressed) { this._invWasPressed = true; this._invPanel.toggle(); }
@@ -124,6 +126,7 @@ class Sector7Scene extends Phaser.Scene {
 
         // Radiation zone (whole room)
         this._checkRadZones(dt);
+        this._objective.refresh();
 
         // Interact hint
         const near = this._nearest();

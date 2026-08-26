@@ -4,9 +4,16 @@
 //
 // Flow:
 //   show() → typewriter starts → [A] skips to end → [A] dismisses
+//   (or, for long text, [A] advances to the next page first)
 //
 // While typing:  prompt shows  "[A] Skip"  (dim, steady)
-// When done:     prompt shows  "[A] Continue"  (teal, blinking)
+// Page done, more remain: "[A] More"  (teal, blinking)
+// Last page done:         "[A] Continue"  (teal, blinking)
+//
+// Long strings are paginated rather than dismissed-and-lost: the
+// content box is only ~5 lines tall, so anything longer is split
+// into pages the player pages through with [A], instead of text
+// silently overflowing past the visible panel.
 // ============================================================
 
 class DialogueBox {
@@ -93,11 +100,9 @@ class DialogueBox {
     //   onDismiss: optional callback fired when box closes
     // -----------------------------------------------------------
     show(speaker, text, onDismiss) {
-        this.isOpen        = true;
-        this.currentText   = text;
-        this.displayedText = '';
-        this.charIndex     = 0;
-        this.onDismiss     = onDismiss || null;
+        this.isOpen    = true;
+        this.onDismiss = onDismiss || null;
+        this._pages    = this._paginate(text);
 
         // Name tag
         this.nameTagBg.clear();
@@ -109,15 +114,59 @@ class DialogueBox {
             this.nameText.setText('');
         }
 
-        // Reset content
-        this.contentText.setText('');
+        this._setVisible(true);
+        this._showPage(0);
+    }
 
-        // Prompt shows "Skip" while typing
+    // -----------------------------------------------------------
+    // Split text into pages that fit the content box. Uses a
+    // monospace character-width estimate (the font is 'monospace',
+    // so every character is the same width) rather than an actual
+    // Phaser text measurement, which keeps this synchronous and
+    // cheap to call on every show().
+    // -----------------------------------------------------------
+    _paginate(text) {
+        const maxCharsPerLine = 61;   // ~446px wide content box at 12px monospace
+        const maxLinesPerPage = 5;    // ~72px tall content area at 12px monospace
+
+        const lines = [];
+        text.split('\n').forEach(paragraph => {
+            if (paragraph.length === 0) { lines.push(''); return; }
+            let cur = '';
+            paragraph.split(' ').forEach(word => {
+                const candidate = cur ? cur + ' ' + word : word;
+                if (candidate.length > maxCharsPerLine && cur) {
+                    lines.push(cur);
+                    cur = word;
+                } else {
+                    cur = candidate;
+                }
+            });
+            if (cur) lines.push(cur);
+        });
+
+        const pages = [];
+        for (let i = 0; i < lines.length; i += maxLinesPerPage) {
+            pages.push(lines.slice(i, i + maxLinesPerPage).join('\n'));
+        }
+        return pages.length ? pages : [''];
+    }
+
+    _hasMorePages() {
+        return this._pageIndex < this._pages.length - 1;
+    }
+
+    _showPage(index) {
+        this._pageIndex     = index;
+        this.currentText    = this._pages[index];
+        this.displayedText  = '';
+        this.charIndex      = 0;
+
+        this.contentText.setText('');
         this.promptText.setText('[A] Skip');
         this.promptText.setAlpha(0.45);
         this._blinkTween.pause();
 
-        this._setVisible(true);
         this._startTypewriter();
     }
 
@@ -149,7 +198,7 @@ class DialogueBox {
 
     // Called automatically when the last character is typed
     _onTypingComplete() {
-        this.promptText.setText('[A] Continue');
+        this.promptText.setText(this._hasMorePages() ? '[A] More' : '[A] Continue');
         this.promptText.setAlpha(1);
         this._blinkTween.resume();
     }
@@ -175,6 +224,8 @@ class DialogueBox {
 
         if (this.charIndex < this.currentText.length) {
             this._skipToEnd();
+        } else if (this._hasMorePages()) {
+            this._showPage(this._pageIndex + 1);
         } else {
             this._dismiss();
         }

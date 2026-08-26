@@ -60,8 +60,11 @@ class WildernessScene extends Phaser.Scene {
         this._heartsHUD._hp=this._hp; this._heartsHUD._draw();
         this._attackGfx =this.add.graphics().setDepth(11);
         this._invPanel  =new InventoryPanel(this); this._invWasPressed=false;
+        this._objective =new ObjectiveBar(this);
+        this._frisbee   =new FrisbeeMinigame(this);
         this._buildInteractables();
         this._createArtifacts();
+        this._createFrisbeeTarget();
         this._setupInput();
         this._radZones=[];
         const qs=(window.gameState&&window.gameState.questState)||0;
@@ -86,11 +89,13 @@ class WildernessScene extends Phaser.Scene {
     }
 
     update(time,delta) {
+        fixUICameraZoom(this);
         const dt=delta||16;
         const iDown=this.iKey&&this.iKey.isDown;
         if(iDown&&!this._invWasPressed){this._invWasPressed=true;this._invPanel.toggle();}
         if(!iDown)this._invWasPressed=false;
         if(this._invPanel.isOpen()){this.player.setVelocity(0,0);return;}
+        if(this._frisbee.isOpen()){this.player.setVelocity(0,0);this._frisbee.update(dt);return;}
         if(this.dialogue.isVisible()){
             this.player.setVelocity(0,0);
             const down=this.eKey.isDown||window.virtualKeys.action;
@@ -159,6 +164,7 @@ class WildernessScene extends Phaser.Scene {
             }
         }
         if(!down)this._actionWasPressed=false;
+        this._objective.refresh();
         this._checkExits();
     }
 
@@ -507,6 +513,24 @@ class WildernessScene extends Phaser.Scene {
         g.fillStyle(0xaaaaaa); g.fillRect(hx-18,hy-3,4,6); g.fillRect(hx+14,hy-3,4,6);
     }
 
+    _createFrisbeeTarget(){
+        const fx=640,fy=560;
+        const g=this.add.graphics().setDepth(3);
+        g.fillStyle(0xcc4444,0.6); g.fillCircle(fx,fy,22);
+        g.fillStyle(0xe8e8e8,0.7); g.fillCircle(fx,fy,15);
+        g.fillStyle(0xcc4444,0.8); g.fillCircle(fx,fy,7);
+        this.interactables.push({
+            id:'frisbee_target', x:fx, y:fy, range:60, hintLabel:'Play frisbee', speaker:'',
+            text:'Toss the frisbee at the target?',
+            onInteract:(s)=>{ s._frisbee.open((score)=>{
+                if(score!=null){
+                    s._localCollected.add('played_frisbee');
+                    if(window.gameState)window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'played_frisbee'])];
+                }
+            }); }
+        });
+    }
+
     _createCaveEntrance(){
         const cx=634,cy=902;
         const g=this.add.graphics().setDepth(4);
@@ -688,11 +712,11 @@ class WildernessScene extends Phaser.Scene {
                       return 'You brought the log back.\nI knew you\'d get in there.\n\n*unrolls something from inside his shelter*\n\nOriginal survey — the lower chambers, sealed section.\nThis is what they didn\'t want people to find.';
                   if(c.includes('survey_map'))
                       return 'You have the map now.\nThe lower chamber is marked in red.\nGo back to the cave — there\'s more to find.';
-                  if(n===0) return 'Heh. Thought I heard new footsteps.\nNot many find this spot. Name\'s Frank.\nBring me pieces of the past — arrowheads, pottery, old tools.\nI\'ll make it worth your while.';
-                  if(n>=10&&!c.includes('frank_lore_3')) return `${n} pieces. You\'ve been listening.\nSit down. I need to tell you about the cave.`;
-                  if(n>=6&&!c.includes('frank_lore_2')) return `Six pieces. That\'s respect for the land.\nHere\'s something worth knowing: "Project Emberlight." Write that down.`;
-                  if(n>=3&&!c.includes('frank_lore_1')) return `Three pieces already. Good eye.\nI\'ll tell you about the cave. You\'ve earned it.`;
-                  return `${n} piece${n>1?'s':''} so far.\nThree gets my first story.`;
+                  if(n===0) return 'Heh. Thought I heard new footsteps.\nNot many find this spot. Name\'s Frank.\nYou\'ll turn up old things out here — arrowheads, bits of pottery, tools.\nBring \'em by and let me take a look.\nI keep a journal on everything that\'s ever turned up in these woods.\nYou hang on to what you find — I just like to know about it.';
+                  if(n>=10&&!c.includes('frank_lore_3')) return `${n} finds in the book now. You\'ve been paying attention.\nSit down. I need to tell you about the cave.`;
+                  if(n>=6&&!c.includes('frank_lore_2')) return `Six finds, six pages. That\'s respect for the land.\nHere\'s something worth writing down yourself: "Project Emberlight."`;
+                  if(n>=3&&!c.includes('frank_lore_1')) return `Three finds already, and a good eye for where to look.\nI\'ll tell you about the cave. You\'ve earned that much.`;
+                  return `${n} find${n>1?'s':''} in the journal so far.\nThree, and I\'ve got a story for you.`;
               },
               onInteract:(s)=>{
                   const n=s._artifactCounts.arrowheads+s._artifactCounts.pottery+s._artifactCounts.tools;
@@ -714,15 +738,15 @@ class WildernessScene extends Phaser.Scene {
                       if(window.gameState)window.gameState.questState=Math.max(window.gameState.questState||0,QUEST_STATES.DEEP_CAVE);
                       return;
                   }
-                  // Artifact lore chain
+                  // Field journal lore chain — Ben keeps every find; Frank just wants to log it
                   if(n>=3&&!c.includes('frank_lore_1')){
                       add('frank_lore_1');
                       s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',
-                          'The cave entrance — south trail, past the creek.\nThe research team used those tunnels to access the site underground.\nI mapped them in \'78.\nSomething stopped them going all the way down.\nThey never told me what.'));
+                          '*jots a few lines in a battered notebook*\n\nThe cave entrance — south trail, past the creek.\nThe research team used those tunnels to access the site underground.\nI mapped them in \'78.\nSomething stopped them going all the way down.\nThey never told me what.'));
                   } else if(n>=6&&!c.includes('frank_lore_2')){
                       add('frank_lore_2');
                       s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',
-                          '"Project Emberlight." Energy research, officially.\nBut the emissions I was seeing...\nThat wasn\'t standard physics.\nI walked away. Should\'ve spoken up.'));
+                          '*adds another page to the journal*\n\n"Project Emberlight." Energy research, officially.\nBut the emissions I was seeing...\nThat wasn\'t standard physics.\nI walked away. Should\'ve spoken up.'));
                   } else if(n>=10&&!c.includes('frank_lore_3')){
                       add('frank_lore_3');
                       s.time.delayedCall(200,()=>s.dialogue.show('OLD FRANK',

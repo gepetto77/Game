@@ -20,8 +20,8 @@ class ColdOpenScene extends Phaser.Scene {
         this._cards = [
             { speaker: '',         text: 'PINEBROOK CAMPGROUND\nInverwood Provincial Park\n\nSummer.' },
             { speaker: 'BEN',      text: 'Third summer here.\nI know every trail. Every hollow tree.\nEvery place Dad told me not to go.' },
-            { speaker: 'BEN',      text: 'There\'s a fence on the east side of the park.\nOld warning signs. Faded.\nNobody talks about what\'s behind it.' },
-            { speaker: 'BEN',      text: 'But sometimes at night you can see\na faint green glow between the trees.\nI\'ve been thinking about it all year.' },
+            { speaker: 'BEN',      text: 'There\'s still corners of this park I haven\'t seen, though.\nDad says the trails go on for miles,\nif you know where to look.' },
+            { speaker: 'BEN',      text: 'Frank used to camp out here too, Dad says.\nHaven\'t seen him yet this summer.\nMaybe he\'s still around somewhere.' },
             { speaker: '[ WALKIE ]', text: '*krrrzzt*\nBen! Dinner\'s almost on the fire.\nDon\'t make me come find you.\n*krrrzzt*' },
             { speaker: 'BEN',      text: 'Guess I\'d better head back.\n\nBut I\'ll come back to this trail.\nI always do.' },
         ];
