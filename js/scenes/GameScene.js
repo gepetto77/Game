@@ -76,6 +76,7 @@ class GameScene extends Phaser.Scene {
         this._invWasPressed = false;
         this._campfireMinigame = new CampfireMinigame(this);
         this._cornhole         = new CornholeMinigame(this);
+        this._pieMaking        = new PieMinigame(this);
         this._firewoodTurnedIn = false;
 
         this._buildInteractables();
@@ -101,6 +102,7 @@ class GameScene extends Phaser.Scene {
         if (this._invPanel.isOpen()) { this.player.setVelocity(0, 0); return; }
         if (this._campfireMinigame.isOpen()) { this.player.setVelocity(0, 0); this._campfireMinigame.update(); return; }
         if (this._cornhole.isOpen()) { this.player.setVelocity(0, 0); this._cornhole.update(dt); return; }
+        if (this._pieMaking.isOpen()) { this.player.setVelocity(0, 0); this._pieMaking.update(dt); return; }
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0, 0);
             this._handleActionPress(() => this.dialogue.tryDismiss());
@@ -321,7 +323,17 @@ class GameScene extends Phaser.Scene {
     _buildInteractables() {
         this.interactables = [
             { id:'campfire',  x:242, y:424, range:60,  hintLabel:'Examine',   speaker:'',
-              text:'The fire is still warm. Ash not cold. Someone lit this very recently.' },
+              getText:(s) => s.collected.has('campfire_built')
+                  ? 'The fire you and Dad built. Still crackling.\nGood for roasting — or a pie, if you\'ve got the iron for it.'
+                  : 'The fire is still warm. Ash not cold. Someone lit this very recently.',
+              onInteract:(s) => {
+                  if (s.collected.has('campfire_built')) {
+                      s._pieMaking.open((result) => {
+                          s._pieCount = (s._pieCount || 0) + 1;
+                          s._saveGameState();
+                      });
+                  }
+              }},
             { id:'mug',       x:212, y:438, range:48,  hintLabel:'Examine',   speaker:'',
               text:'A tin mug — half-full of cold coffee. Whoever left it didn\'t plan to be long.' },
             { id:'tent',      x:186, y:468, range:55,  hintLabel:'Look inside', speaker:'',
@@ -993,7 +1005,8 @@ class GameScene extends Phaser.Scene {
     // GAME STATE
     // ----------------------------------------------------------
     _saveGameState() {
-        window.gameState = {
+        if (!window.gameState) window.gameState = {};
+        Object.assign(window.gameState, {
             collected:      Array.from(this.collected),
             questState:     this.quest.state,
             artifactCounts: { ...this._artifactCounts },
@@ -1002,7 +1015,8 @@ class GameScene extends Phaser.Scene {
             hp:             this._hp,
             maxHp:          this._maxHp,
             firewoodTurnedIn: this._firewoodTurnedIn || false,
-        };
+            pieCount:       this._pieCount || 0,
+        });
         SaveManager.save(window.gameState);
     }
 
@@ -1013,6 +1027,7 @@ class GameScene extends Phaser.Scene {
         this._gateOpen        = gs.gateOpen || false;
         this._endingPlayed    = gs.endingPlayed || false;
         this._firewoodTurnedIn = gs.firewoodTurnedIn || false;
+        this._pieCount         = gs.pieCount || 0;
         this._updateFirewoodHUD();
 
         if (gs.questState > 0) {
