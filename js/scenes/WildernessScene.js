@@ -60,8 +60,10 @@ class WildernessScene extends Phaser.Scene {
         this._heartsHUD._hp=this._hp; this._heartsHUD._draw();
         this._attackGfx =this.add.graphics().setDepth(11);
         this._invPanel  =new InventoryPanel(this); this._invWasPressed=false;
+        this._frisbee   =new FrisbeeMinigame(this);
         this._buildInteractables();
         this._createArtifacts();
+        this._createFrisbeeTarget();
         this._setupInput();
         this._radZones=[];
         const qs=(window.gameState&&window.gameState.questState)||0;
@@ -91,6 +93,7 @@ class WildernessScene extends Phaser.Scene {
         if(iDown&&!this._invWasPressed){this._invWasPressed=true;this._invPanel.toggle();}
         if(!iDown)this._invWasPressed=false;
         if(this._invPanel.isOpen()){this.player.setVelocity(0,0);return;}
+        if(this._frisbee.isOpen()){this.player.setVelocity(0,0);this._frisbee.update(dt);return;}
         if(this.dialogue.isVisible()){
             this.player.setVelocity(0,0);
             const down=this.eKey.isDown||window.virtualKeys.action;
@@ -505,6 +508,24 @@ class WildernessScene extends Phaser.Scene {
         g.fillStyle(0x8a7a50); g.fillEllipse(hx,hy,60,40);
         g.fillStyle(0x6a5a38); g.fillEllipse(hx,hy,40,26);
         g.fillStyle(0xaaaaaa); g.fillRect(hx-18,hy-3,4,6); g.fillRect(hx+14,hy-3,4,6);
+    }
+
+    _createFrisbeeTarget(){
+        const fx=640,fy=560;
+        const g=this.add.graphics().setDepth(3);
+        g.fillStyle(0xcc4444,0.6); g.fillCircle(fx,fy,22);
+        g.fillStyle(0xe8e8e8,0.7); g.fillCircle(fx,fy,15);
+        g.fillStyle(0xcc4444,0.8); g.fillCircle(fx,fy,7);
+        this.interactables.push({
+            id:'frisbee_target', x:fx, y:fy, range:60, hintLabel:'Play frisbee', speaker:'',
+            text:'Toss the frisbee at the target?',
+            onInteract:(s)=>{ s._frisbee.open((score)=>{
+                if(score!=null){
+                    s._localCollected.add('played_frisbee');
+                    if(window.gameState)window.gameState.collected=[...new Set([...(window.gameState.collected||[]),'played_frisbee'])];
+                }
+            }); }
+        });
     }
 
     _createCaveEntrance(){
