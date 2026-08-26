@@ -56,8 +56,10 @@ class LakeScene extends Phaser.Scene {
         this._heartsHUD._hp = this._hp; this._heartsHUD._draw();
         this._attackGfx = this.add.graphics().setDepth(11);
         this._invPanel  = new InventoryPanel(this); this._invWasPressed = false;
+        this._fishing   = new FishingMinigame(this);
         this._buildInteractables();
         this._createArtifacts();
+        this._createFishingSpot();
         this._setupInput();
 
         // Radiation zones over contamination patches
@@ -91,6 +93,7 @@ class LakeScene extends Phaser.Scene {
         if (iDown && !this._invWasPressed) { this._invWasPressed = true; this._invPanel.toggle(); }
         if (!iDown) this._invWasPressed = false;
         if (this._invPanel.isOpen()) { this.player.setVelocity(0, 0); return; }
+        if (this._fishing.isOpen()) { this.player.setVelocity(0, 0); this._fishing.update(dt); return; }
         if (this.dialogue.isVisible()) {
             this.player.setVelocity(0,0);
             const down = this.eKey.isDown || window.virtualKeys.action;
@@ -197,7 +200,33 @@ class LakeScene extends Phaser.Scene {
         gs.artifactCounts = {...this._artifactCounts};
         gs.hp             = this._hp;
         gs.maxHp          = this._maxHp;
+        gs.fishLog        = Array.from(new Set(gs.fishLog||[]));
         SaveManager.save(window.gameState);
+    }
+
+    // --- Fishing ---
+    _createFishingSpot() {
+        const fx = 780, fy = 423;
+        const g = this.add.graphics().setDepth(3);
+        g.fillStyle(0x2a7aa0, 0.4); g.fillEllipse(fx, fy, 30, 14);
+        this.interactables.push({
+            id: 'fishing_spot', x: fx, y: fy, range: 55, hintLabel: 'Fish here', speaker: '',
+            getText: () => {
+                const gs = window.gameState || {};
+                if (!(gs.fishLog && gs.fishLog.length))
+                    return 'Old Pete showed you how to hold a rod once. Might as well try your luck.';
+                return 'Quiet spot at the end of the dock. Good for fishing.';
+            },
+            onInteract: (s) => {
+                s._fishing.open((species) => {
+                    if (species) {
+                        if (!window.gameState) window.gameState = {};
+                        window.gameState.fishLog = Array.from(new Set([...(window.gameState.fishLog||[]), species]));
+                        s._saveState();
+                    }
+                });
+            }
+        });
     }
 
     _setupInput() {
@@ -447,6 +476,8 @@ class LakeScene extends Phaser.Scene {
                       return 'You found proof.\nI always knew — forty years fishin\' this lake.\nGet that out to people.';
                   if(c.includes('bolt_cutters'))
                       return 'You found a way in there, didn\'t you.\nSame look I had in \'89.\nBe careful — those people don\'t like witnesses.';
+                  if(!((window.gameState&&window.gameState.fishLog)||[]).length)
+                      return 'Been fishin\' this lake forty years.\nUsed to catch a full basket by noon.\n...Haven\'t eaten anything from here since \'91.\nWater changed. Fish started dyin\'.\nNobody official will say why.\n\nStill plenty biting off the end of the dock, though.\nCast a line if you want — just don\'t eat \'em.';
                   return 'Been fishin\' this lake forty years.\nUsed to catch a full basket by noon.\n...Haven\'t eaten anything from here since \'91.\nWater changed. Fish started dyin\'.\nNobody official will say why.';
               },
               onInteract:(s)=>{
